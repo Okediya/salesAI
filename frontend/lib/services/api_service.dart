@@ -264,6 +264,45 @@ class ApiService {
       throw Exception('Network error processing inbound message: $e');
     }
   }
+
+  Future<Map<String, dynamic>> sendChatMessage(String message, {List<Map<String, String>> history = const []}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/agent/chat'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'message': message,
+          'history': history,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Chat failed: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error during chat: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> batchImportLeads(String rawContacts) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/leads/batch-import'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'raw_contacts': rawContacts,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Batch import failed: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error during batch import: $e');
+    }
+  }
 }
 
 final apiService = ApiService();

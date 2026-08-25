@@ -16,10 +16,21 @@ class SalesAiProvider with ChangeNotifier {
   String? _errorMessage;
   Timer? _pollingTimer;
 
+  final List<Map<String, dynamic>> _chatMessages = [
+    {
+      'sender': 'bot',
+      'text': 'Hello. I am SalesAI, your dedicated autonomous sales and marketing partner. Give me your phone number, email, or startup website, and I will begin finding customers and driving your outbound pipeline.',
+      'time': DateTime.now(),
+    }
+  ];
+  bool _isChatLoading = false;
+
   DashboardStatsModel? get stats => _stats;
   List<LeadModel> get leads => _leads;
   List<CampaignModel> get campaigns => _campaigns;
   ProductModel? get activeProduct => _activeProduct;
+  List<Map<String, dynamic>> get chatMessages => _chatMessages;
+  bool get isChatLoading => _isChatLoading;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAgentRunning => _stats?.agentState.isRunning ?? false;
@@ -272,4 +283,76 @@ class SalesAiProvider with ChangeNotifier {
       rethrow;
     }
   }
+
+  Future<void> sendChatMessage(String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+
+    // Append user message immediately
+    _chatMessages.add({
+      'sender': 'user',
+      'text': trimmed,
+      'time': DateTime.now(),
+    });
+    _isChatLoading = true;
+    notifyListeners();
+
+    try {
+      final history = _chatMessages.map((m) => {
+        'role': m['sender'] == 'user' ? 'user' : 'model',
+        'parts': m['text'].toString(),
+      }).toList();
+
+      final res = await _api.sendChatMessage(trimmed, history: history.cast<Map<String, String>>());
+      final botReply = res['reply'] as String? ?? 'Message processed.';
+
+      _chatMessages.add({
+        'sender': 'bot',
+        'text': botReply,
+        'time': DateTime.now(),
+        'action_type': res['action_type'],
+        'action_data': res['action_data'],
+      });
+
+      await refreshStatsSilent();
+      await fetchLeadsSilent();
+      await fetchCampaignsSilent();
+    } catch (e) {
+      _chatMessages.add({
+        'sender': 'bot',
+        'text': 'I encountered an issue processing your request: $e. Please verify backend connection.',
+        'time': DateTime.now(),
+      });
+    } finally {
+      _isChatLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> batchImportLeads(String rawContacts) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final result = await _api.batchImportLeads(rawContacts);
+      await fetchLeadsSilent();
+      await fetchCampaignsSilent();
+      await refreshStatsSilent();
+      
+      // Also post a summary message into the bot chat
+      _chatMessages.add({
+        'sender': 'bot',
+        'text': 'Imported ${result['imported_count']} new contacts into your sales pipeline. Automated daily follow-ups and touchpoints are scheduled.',
+        'time': DateTime.now(),
+      });
+      
+      return result;
+    } catch (e) {
+      _errorMessage = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 }
+

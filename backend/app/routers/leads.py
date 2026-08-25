@@ -166,7 +166,7 @@ async def dispatch_lead_whatsapp(lead_id: int, db: Session = Depends(get_db)):
     if not campaign:
         campaign = db.query(Campaign).filter(Campaign.lead_id == lead_id).first()
 
-    body = campaign.body if campaign else f"Hi {lead.name} 👋 Reaching out to see if you're open to exploring how we can help {lead.company} scale sales pipeline automatically."
+    body = campaign.body if campaign else f"Hi {lead.name}, reaching out to see if you're open to exploring how we can help {lead.company} scale sales pipeline automatically."
 
     result = await delivery_service.dispatch_whatsapp(
         phone_number=lead.phone_number,
@@ -212,7 +212,7 @@ async def dispatch_lead_telegram(lead_id: int, db: Session = Depends(get_db)):
     if not campaign:
         campaign = db.query(Campaign).filter(Campaign.lead_id == lead_id).first()
 
-    body = campaign.body if campaign else f"Hi {lead.name} 👋 Saw your work at {lead.company}! Open to seeing how we help teams scale revenue with autonomous 24/7 agents?"
+    body = campaign.body if campaign else f"Hi {lead.name}, saw your work at {lead.company}. Open to seeing how we help teams scale revenue with autonomous sales agents?"
 
     product = db.query(Product).filter(Product.id == lead.product_id).first()
     bot_token = product.telegram_bot_token if product else None
@@ -309,5 +309,119 @@ async def simulate_prospect_reply(
     """Triggers SdrAgent to analyze intent and produce objection-handling counter-response."""
     result = await orchestrator.execute_sdr_reply_handling(db, lead_id, message)
     return result
+
+@router.post("/batch-import")
+async def batch_import_contacts(
+    req: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Ingests pasted raw lists of Telegram handles (@user), emails, or phone numbers
+    and converts them into leads with automated daily nurturing.
+    """
+    import re
+    raw_text = req.get("raw_contacts", "")
+    if not raw_text:
+        raise HTTPException(status_code=400, detail="raw_contacts cannot be empty")
+
+    active_product = db.query(Product).filter(Product.is_active == True).first()
+    if not active_product:
+        active_product = db.query(Product).first()
+
+    if not active_product:
+        raise HTTPException(status_code=400, detail="No active product found. Please onboard your product first.")
+
+    # Extract all emails, telegrams, and phones
+    emails = list(set(re.findall(r"[\w\.-]+@[\w\.-]+\.\w+", raw_text)))
+    telegrams = list(set(re.findall(r"@([a-zA-Z0-9_]{3,32})", raw_text)))
+    
+    # Also support lines formatted as pure handles without @
+    lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
+    for line in lines:
+        if not "@" in line and not " " in line and len(line) >= 4 and not line.isdigit():
+            if line not in telegrams:
+                telegrams.append(line)
+
+    phones = list(set(re.findall(r"[\+\(]?[0-9][0-9 \-\(\)]{7,}[0-9]", raw_text)))
+
+    created_leads = []
+    
+    # Ingest Telegram handles
+    for tg in telegrams:
+        clean_tg = tg.replace("@", "").strip()
+        lead = Lead(
+            product_id=active_product.id,
+            name=f"Telegram Account @{clean_tg}",
+            company="Prospective Account",
+            role="Decision Maker",
+            telegram_handle=clean_tg,
+            status=LeadStatus.DISCOVERED,
+            confidence_score=0.92,
+            pain_points="Direct contact imported for automated daily check-in and product updates",
+            personalization_hooks="Active Telegram lead channel",
+            is_approved=True
+        )
+        db.add(lead)
+        created_leads.append(lead)
+
+    # Ingest Email contacts
+    for em in emails:
+        clean_em = em.strip().lower()
+        lead = Lead(
+            product_id=active_product.id,
+            name=clean_em.split("@")[0].capitalize(),
+            company=clean_em.split("@")[1].split(".")[0].capitalize(),
+            role="Executive",
+            email=clean_em,
+            status=LeadStatus.DISCOVERED,
+            confidence_score=0.90,
+            pain_points="Email subscriber imported for daily updates and scheduled outreach",
+            personalization_hooks="Direct email subscriber",
+            is_approved=True
+        )
+        db.add(lead)
+        created_leads.append(lead)
+
+    # Ingest Phone numbers
+    for ph in phones:
+        clean_ph = ph.strip()
+        lead = Lead(
+            product_id=active_product.id,
+            name=f"Phone Contact {clean_ph[-4:]}",
+            company="Mobile Account",
+            role="Prospect",
+            phone_number=clean_ph,
+            status=LeadStatus.DISCOVERED,
+            confidence_score=0.88,
+            pain_points="Direct mobile lead for WhatsApp / SMS engagement",
+            is_approved=True
+        )
+        db.add(lead)
+        created_leads.append(lead)
+
+    db.commit()
+
+    # Generate initial outreach copy for the first 3 newly imported leads
+    for lead in created_leads[:3]:
+        try:
+            await orchestrator.execute_campaign_generation(db, lead.id)
+        except Exception as e:
+            logger.warning(f"Auto copy generation failed for lead {lead.id}: {e}")
+
+    await taskmaster_engine.broadcast_event("BATCH_LEADS_IMPORTED", {
+        "count": len(created_leads),
+        "telegrams": len(telegrams),
+        "emails": len(emails)
+    })
+
+    return {
+        "success": True,
+        "imported_count": len(created_leads),
+        "detected_telegrams": telegrams,
+        "detected_emails": emails,
+        "detected_phones": phones,
+        "message": f"Successfully imported {len(created_leads)} contacts into autonomous sales pipeline."
+    }
+
 
 

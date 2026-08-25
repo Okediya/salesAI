@@ -132,3 +132,24 @@ async def seed_demo_data(db: Session = Depends(get_db)):
         await orchestrator.execute_campaign_generation(db, lead.id)
 
     return {"message": "Demo data seeded successfully!", "product_id": product.id, "leads_created": len(leads)}
+
+@router.post("/chat")
+async def chat_with_sales_agent(
+    req: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Conversational AI interface. Interacts naturally with the user, collects product & contact info,
+    finds leads, writes ads, and runs daily follow-ups.
+    """
+    from backend.app.agents.conversational_agent import conversational_agent
+    
+    user_msg = req.get("message", "")
+    history = req.get("history", [])
+    
+    if not user_msg:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+        
+    result = await conversational_agent.handle_user_message(db, user_msg, history)
+    return result
+

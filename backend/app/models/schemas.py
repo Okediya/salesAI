@@ -247,3 +247,29 @@ class DashboardStatsResponse(BaseModel):
     agent_state: AgentStateResponse
     active_product: Optional[ProductResponse] = None
     recent_activities: List[ActivityLogResponse] = []
+
+# --- Conversational Bot Chat Schemas ---
+class ChatMessageRequest(BaseModel):
+    message: str = Field(..., description="Message text from user to the sales bot")
+    history: Optional[List[Dict[str, str]]] = Field(default=[], description="Recent conversation turns")
+
+class ChatMessageResponse(BaseModel):
+    reply: str
+    action_type: str = "CONVERSATION"
+    action_data: Dict[str, Any] = {}
+    extracted_info: Dict[str, Any] = {}
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+# --- Batch Contact Import Schemas ---
+class BatchLeadImportRequest(BaseModel):
+    raw_contacts: str = Field(..., description="Pasted list of Telegram handles (@user), emails, or phone numbers separated by newlines or commas")
+    company_context: Optional[str] = None
+
+class BatchLeadImportResponse(BaseModel):
+    success: bool
+    imported_count: int
+    detected_telegrams: List[str] = []
+    detected_emails: List[str] = []
+    detected_phones: List[str] = []
+    message: str
+

@@ -74,7 +74,7 @@ Step 3: Direct follow-up / LinkedIn DM
                     "channel": "TELEGRAM" if telegram_handle else "WHATSAPP",
                     "step_number": 2,
                     "subject": None,
-                    "body": f"Hi {first_name} 👋 Reaching out from {product_name}. Saw what you're building at {company}! We help teams solve {pain_points.lower() if pain_points else 'sales prospecting'} automatically with autonomous AI agents. Open to a quick 2-minute overview?",
+                    "body": f"Hi {first_name}, reaching out from {product_name}. Saw what you're building at {company}! We help teams solve {pain_points.lower() if pain_points else 'sales prospecting'} automatically with autonomous AI agents. Open to a quick 2-minute overview?",
                     "call_to_action": "Should I send over the quick 2-min demo?"
                 },
                 {
