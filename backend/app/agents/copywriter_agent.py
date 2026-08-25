@@ -53,9 +53,14 @@ Continuous Knowledge Base: {knowledge_base or 'N/A'}
 UI Features Analyzed: {image_features or 'N/A'}
 
 Produce:
-Step 1: Hyper-personalized initial cold email (with compelling subject)
-Step 2: Direct personalized Telegram / WhatsApp message (conversational, punchy, low friction)
-Step 3: Direct follow-up / LinkedIn DM
+Step 1: Warm, friendly initial cold email (conversational, authentic, respectful of their time)
+Step 2: Direct personalized Telegram / WhatsApp message (human-to-human, friendly check-in, zero aggressive pressure)
+Step 3: Gentle value-add follow-up or check-in
+
+TONE & STYLE:
+- Speak like a thoughtful, warm peer and trusted partner.
+- Do NOT use emojis.
+- Avoid robotic corporate clichés. Build genuine rapport and friendship with the customer.
 """
 
         fallback_data: Dict[str, Any] = {

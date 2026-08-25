@@ -148,10 +148,13 @@ class AgentOrchestrator:
             return []
 
         product = db.query(Product).filter(Product.id == lead.product_id).first()
-        if not product:
-            return []
-
-        value_props = json.loads(product.value_propositions) if product.value_propositions else [product.description]
+        value_props = [product.description or "Automated sales engine"]
+        if product.value_propositions:
+            try:
+                parsed = json.loads(product.value_propositions)
+                value_props = parsed if isinstance(parsed, list) else [str(parsed)]
+            except Exception:
+                value_props = [product.value_propositions]
 
         self.log_activity(
             db,

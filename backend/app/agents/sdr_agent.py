@@ -43,7 +43,7 @@ Determine:
 2. Intent Score (0-100)
 3. Objection Type (Price, Timing, Competitor, Feature, Authority, None)
 4. Recommended Action
-5. Suggested Reply (Polite, concise, value-focused counter-response answering their specific question using the knowledge base)
+5. Suggested Reply (Warm, empathetic, respectful, and human response answering their specific question using the company knowledge base. Sound like a genuine, friendly advisor. No emojis.)
 """
 
         # Calibrate fallback based on simple keywords
