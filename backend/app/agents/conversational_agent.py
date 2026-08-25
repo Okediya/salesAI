@@ -16,105 +16,55 @@ from backend.app.engine.taskmaster_loop import taskmaster_engine
 
 logger = logging.getLogger(__name__)
 
+# List of common public email domains to ignore when guessing company name
+PUBLIC_EMAIL_DOMAINS = {
+    "gmail", "yahoo", "outlook", "hotmail", "icloud", "proton", "protonmail", "mail", "zoho", "aol"
+}
+
 class ConversationalAgent:
     """
-    Primary conversational sales partner.
-    Interacts naturally like a warm, supportive colleague.
-    Configures itself automatically from emails, phone numbers, website links, or Telegram tokens.
+    Intelligent, multi-turn conversational AI sales partner.
+    Understands context, remembers chat history, checks live database state,
+    and configures outreach channels automatically without rigid canned responses.
     """
 
     async def handle_user_message(
         self,
         db: Session,
         message: str,
-        history: Optional[List[Dict[str, str]]] = None
+        history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         user_text = message.strip()
+        lower_msg = user_text.lower()
+
         active_product = db.query(Product).filter(Product.is_active == True).first()
         if not active_product:
             active_product = db.query(Product).first()
 
-        # Extract entities from user message
+        # Clean up any bad auto-named product like "Gmail"
+        if active_product and active_product.name.lower() in PUBLIC_EMAIL_DOMAINS:
+            active_product.name = "My Startup"
+            db.commit()
+
+        # Extract entities from current user message
         extracted_info = self._extract_entities(user_text)
 
-        # Context for AI partner
-        product_context = "No company configured yet."
-        if active_product:
-            product_context = (
-                f"Company: {active_product.name}\n"
-                f"Tagline: {active_product.tagline or 'N/A'}\n"
-                f"Website: {active_product.website_url or 'N/A'}\n"
-                f"Telegram Bot: {active_product.telegram_handle or 'Not connected'}\n"
-                f"Target ICP: {active_product.icp_summary or 'N/A'}\n"
-                f"Knowledge Base: {(active_product.knowledge_base or '')[:300]}"
-            )
-
-        prompt = f"""
-You are SalesAI, a dedicated, warm, and highly capable sales and marketing partner.
-You speak with genuine human warmth, authenticity, and empathy like a sharp co-founder or head of growth.
-Do NOT use emojis anywhere in your response. Keep your tone natural, friendly, and helpful.
-
-CURRENT COMPANY CONTEXT:
-{product_context}
-
-USER MESSAGE:
-{user_text}
-
-EXTRACTED ENTITIES FROM USER INPUT:
-{json.dumps(extracted_info)}
-
-INSTRUCTIONS:
-1. If the user provides an email, phone number, website, or Telegram token, congratulate and thank them warmly, confirming that their company identity and outreach channels are now automatically configured.
-2. If the user asks about creating a Telegram bot, explain that you can connect it instantly—they just need to open Telegram @BotFather, type /newbot, and paste the HTTP API Token here.
-3. If the user asks to find customers or reach out to people, explain that you will discover verified decision makers and craft warm, friendly relationship-building messages to befriend them and share value.
-4. If the user asks to write an ad or check in on leads, generate friendly, authentic copy focused on solving real problems without aggressive sales hype.
-5. Speak as their partner ("I've set this up for us", "Here is what I suggest we do next").
-"""
-
-        bot_reply = ""
         action_type = "CONVERSATION"
         action_data = {}
+        immediate_action_note = ""
 
-        # Gemini generation
-        if gemini_client._genai_client:
-            try:
-                resp = gemini_client._genai_client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt,
-                )
-                if resp and resp.text:
-                    bot_reply = resp.text.strip()
-            except Exception as e:
-                logger.warning(f"GenAI chat error: {e}")
-
-        if not bot_reply and gemini_client._legacy_genai:
-            try:
-                model = gemini_client._legacy_genai.GenerativeModel("gemini-1.5-flash")
-                resp = model.generate_content(prompt)
-                if resp and resp.text:
-                    bot_reply = resp.text.strip()
-            except Exception as e:
-                logger.warning(f"Legacy genai chat error: {e}")
-
-        if not bot_reply:
-            bot_reply = self._generate_rule_based_response(user_text, extracted_info, active_product)
-
-        # Strip emojis to maintain minimalist monochrome theme
-        bot_reply = self._strip_emojis(bot_reply)
-
-        lower_msg = user_text.lower()
-
-        # Handle Telegram Bot Token verification & self-configuration
+        # 1. Check if user provided a Telegram Bot Token
         if extracted_info.get("telegram_bot_token"):
             token = extracted_info["telegram_bot_token"]
             bot_info = await self._verify_telegram_bot_token(token)
             if bot_info.get("valid"):
                 bot_username = bot_info.get("username", "")
+                bot_title = bot_info.get("first_name", "My Company")
                 if not active_product:
                     active_product = Product(
-                        name=bot_info.get("first_name", "My Company"),
+                        name=bot_title,
                         tagline=f"Outbound engine via @{bot_username}",
-                        description=f"Telegram bot @{bot_username} configured for autonomous customer outreach.",
+                        description=f"Telegram bot @{bot_username} configured for autonomous outreach.",
                         telegram_handle=bot_username,
                         telegram_bot_token=token,
                         is_active=True
@@ -125,83 +75,155 @@ INSTRUCTIONS:
                     active_product.telegram_handle = bot_username
                 db.commit()
                 db.refresh(active_product)
-
                 action_type = "TELEGRAM_BOT_CONNECTED"
                 action_data = {"bot_username": bot_username}
-                bot_reply += f"\n\nTelegram Bot Connected: Verified @{bot_username}. I am now able to autonomously send messages and check-ins directly through your Telegram bot."
+                immediate_action_note = f"Telegram Bot @{bot_username} was just successfully verified and connected."
 
-        # Auto-create product if none exists and user provides details
-        elif not active_product and (extracted_info.get("website_url") or extracted_info.get("emails") or extracted_info.get("phone_numbers")):
-            try:
-                website = extracted_info.get("website_url") or ""
-                email = extracted_info["emails"][0] if extracted_info.get("emails") else ""
-                phone = extracted_info["phone_numbers"][0] if extracted_info.get("phone_numbers") else ""
-                company_name = "My Company"
-                if website:
-                    from urllib.parse import urlparse
-                    parsed = urlparse(website)
-                    company_name = parsed.hostname.replace("www.", "").split(".")[0].capitalize() if parsed.hostname else "My Company"
-                elif email:
-                    company_name = email.split("@")[1].split(".")[0].capitalize()
-
-                new_product = Product(
-                    name=company_name,
-                    tagline=f"{company_name} - Autonomous Sales Engine",
-                    description=f"Company onboarded automatically via chat. Website: {website}. Contact: {email or phone}.",
-                    website_url=website or None,
+        # 2. Check if user shared website URL
+        elif extracted_info.get("website_url"):
+            website = extracted_info["website_url"]
+            if not active_product:
+                from urllib.parse import urlparse
+                parsed = urlparse(website)
+                comp_name = parsed.hostname.replace("www.", "").split(".")[0].capitalize() if parsed.hostname else "My Company"
+                active_product = Product(
+                    name=comp_name,
+                    tagline=f"{comp_name} Sales Engine",
+                    description=f"Website: {website}",
+                    website_url=website,
                     target_market="B2B decision makers and target accounts",
                     pricing_model="Custom Tier",
                     value_propositions="Automated customer engagement and relationship-first outbound pipeline.",
-                    is_active=True,
+                    is_active=True
                 )
-                db.add(new_product)
+                db.add(active_product)
                 db.commit()
-                db.refresh(new_product)
-                active_product = new_product
+                db.refresh(active_product)
                 action_type = "PRODUCT_CREATED"
-                action_data = {"product_id": new_product.id, "name": new_product.name}
-
-                # Auto-scrape website in background
-                if website:
-                    try:
-                        scrape_res = await knowledge_extractor.scrape_website(website)
-                        if scrape_res.get("success"):
-                            active_product.knowledge_base = scrape_res.get("summary", "")
-                            db.commit()
-                    except Exception:
-                        pass
-
-                bot_reply += f"\n\nI have configured our company profile for \"{company_name}\" and set your contact channels. What kind of customers should we befriend and reach out to?"
-            except Exception as ex:
-                logger.warning(f"Auto-create product failed: {ex}")
-
-        # Update existing active product with new contact info
-        elif active_product and (extracted_info.get("website_url") or extracted_info.get("emails")):
-            if extracted_info.get("website_url") and not active_product.website_url:
-                active_product.website_url = extracted_info["website_url"]
+                action_data = {"name": comp_name, "url": website}
+            else:
+                active_product.website_url = website
                 db.commit()
 
-        # Handle prospect discovery command
+            # Scrape website in background
+            try:
+                scrape_res = await knowledge_extractor.scrape_website(website)
+                if scrape_res.get("success"):
+                    active_product.knowledge_base = scrape_res.get("summary", "")
+                    db.commit()
+                    immediate_action_note = f"Synced website knowledge from {website}."
+            except Exception as ex:
+                logger.warning(f"Auto-scrape failed: {ex}")
+
+        # 3. Check if user provided contact info without existing product
+        elif not active_product and (extracted_info.get("emails") or extracted_info.get("phone_numbers")):
+            email = extracted_info["emails"][0] if extracted_info.get("emails") else ""
+            phone = extracted_info["phone_numbers"][0] if extracted_info.get("phone_numbers") else ""
+            comp_name = "My Startup"
+            if email:
+                domain_part = email.split("@")[1].split(".")[0].lower()
+                if domain_part not in PUBLIC_EMAIL_DOMAINS:
+                    comp_name = domain_part.capitalize()
+
+            active_product = Product(
+                name=comp_name,
+                tagline=f"{comp_name} Outreach",
+                description=f"Contact: {email or phone}",
+                target_market="B2B decision makers",
+                pricing_model="Custom Tier",
+                value_propositions="Automated customer engagement",
+                is_active=True
+            )
+            db.add(active_product)
+            db.commit()
+            db.refresh(active_product)
+            action_type = "PRODUCT_CREATED"
+            action_data = {"name": comp_name}
+            immediate_action_note = f"Saved your contact info ({email or phone}) and created company profile '{comp_name}'."
+
+        # 4. Check if user asked to find leads/customers
         if "find" in lower_msg and ("customer" in lower_msg or "lead" in lower_msg or "prospect" in lower_msg or "friend" in lower_msg):
             if active_product:
                 discovered = await orchestrator.execute_prospecting_cycle(db, active_product.id, batch_size=3)
                 action_type = "PROSPECTS_DISCOVERED"
                 action_data = {"count": len(discovered), "leads": [l.name for l in discovered]}
-                bot_reply += f"\n\nFound {len(discovered)} qualified decision makers to reach out to. You can review them in the Pipeline tab."
-            else:
-                bot_reply += "\n\nPlease share your company website or contact details first so I can tailor the prospect search."
+                immediate_action_note = f"Found {len(discovered)} qualified decision makers: {', '.join([l.name for l in discovered])}."
 
-        # Handle batch lead imports from chat
+        # 5. Check if user pasted customer list / handles
         elif extracted_info.get("telegram_handles") or (extracted_info.get("emails") and active_product):
             imported_count = await self._auto_import_leads(db, extracted_info, active_product)
             if imported_count > 0:
                 action_type = "LEADS_IMPORTED"
                 action_data = {"count": imported_count}
+                immediate_action_note = f"Imported {imported_count} contacts into the active pipeline."
+
+        # Build live database state context
+        lead_count = db.query(Lead).count() if active_product else 0
+        has_telegram_bot = bool(active_product and active_product.telegram_bot_token)
+        telegram_handle = active_product.telegram_handle if active_product else None
+        website_url = active_product.website_url if active_product else None
+
+        db_context = f"""
+LIVE SYSTEM STATE:
+- Active Company: {active_product.name if active_product else 'Not configured yet'}
+- Website: {website_url or 'None'}
+- Telegram Bot: {'Connected (@' + telegram_handle + ')' if has_telegram_bot else 'Not connected yet'}
+- Total Leads in Pipeline: {lead_count}
+- Immediate Event Just Handled: {immediate_action_note or 'None'}
+"""
+
+        # Format recent chat history
+        history_formatted = ""
+        if history and isinstance(history, list):
+            recent_turns = history[-6:]
+            for turn in recent_turns:
+                role = "User" if turn.get("sender") == "user" or turn.get("role") == "user" else "SalesAI"
+                text = turn.get("text") or turn.get("parts") or ""
+                if text:
+                    history_formatted += f"{role}: {text}\n"
+
+        prompt = f"""
+You are SalesAI, a dedicated, warm, and highly intelligent human-like sales partner and co-founder.
+You talk naturally like an experienced growth partner. You have full context of our conversation and live setup.
+
+{db_context}
+
+RECENT CONVERSATION HISTORY:
+{history_formatted}
+
+CURRENT USER MESSAGE:
+{user_text}
+
+INSTRUCTIONS:
+1. Respond directly and conversationally to what the user just asked in context of the conversation.
+2. If the user asks about Telegram ("did you link it?", "how to link telegram", etc.), give a specific, accurate answer based on the LIVE SYSTEM STATE above:
+   - If Telegram is connected: Confirm warmly that @{telegram_handle} is linked and ready.
+   - If not connected: Explain that they can message @BotFather on Telegram, type /newbot, and paste the HTTP API token right here in chat.
+3. If the user says hello or asks how you are, reply warmly, naturally, and ask how you can help with their sales today.
+4. If the user shares their website, product description, or target audience, acknowledge what they do with genuine interest.
+5. NEVER repeat rigid canned disclaimers or repetitive robotic templates.
+6. Strictly DO NOT use any emojis anywhere in your response.
+"""
+
+        bot_reply = await self._generate_ai_response(prompt)
+
+        # Fallback intelligent rule-based dynamic generator if all AI models fail
+        if not bot_reply:
+            bot_reply = self._generate_contextual_fallback(
+                user_text,
+                lower_msg,
+                active_product,
+                has_telegram_bot,
+                telegram_handle,
+                immediate_action_note
+            )
+
+        bot_reply = self._strip_emojis(bot_reply)
 
         orchestrator.log_activity(
             db,
             role="SalesAI Partner",
-            action=f"Chat message: {user_text[:50]}",
+            action=f"Chat interaction: {user_text[:50]}",
             details=bot_reply[:100],
             level="INFO"
         )
@@ -212,6 +234,80 @@ INSTRUCTIONS:
             "action_data": action_data,
             "extracted_info": extracted_info
         }
+
+    async def _generate_ai_response(self, prompt: str) -> str:
+        """Tries multiple Gemini models in sequence with graceful fallback."""
+        models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+        
+        # 1. Try google-genai modern SDK
+        if gemini_client._genai_client:
+            for model_name in models_to_try:
+                try:
+                    resp = gemini_client._genai_client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                    )
+                    if resp and resp.text:
+                        return resp.text.strip()
+                except Exception as e:
+                    logger.warning(f"GenAI SDK attempt with {model_name} failed: {e}")
+
+        # 2. Try legacy google.generativeai SDK
+        if gemini_client._legacy_genai:
+            for model_name in ["gemini-1.5-flash", "gemini-1.5-pro"]:
+                try:
+                    model = gemini_client._legacy_genai.GenerativeModel(model_name)
+                    resp = model.generate_content(prompt)
+                    if resp and resp.text:
+                        return resp.text.strip()
+                except Exception as ex:
+                    logger.warning(f"Legacy genai attempt with {model_name} failed: {ex}")
+
+        return ""
+
+    def _generate_contextual_fallback(
+        self,
+        text: str,
+        lower: str,
+        product: Optional[Product],
+        has_telegram: bool,
+        telegram_handle: Optional[str],
+        immediate_action_note: str
+    ) -> str:
+        """Intelligent contextual fallback when API quota is unavailable."""
+        if immediate_action_note:
+            return f"Done. {immediate_action_note} Let me know what you would like to do next—we can search for leads, draft outreach messages, or check on our pipeline."
+
+        # Greetings
+        if any(w in lower for w in ["hello", "hi", "hey", "good morning", "good afternoon", "how are you"]):
+            if product:
+                tg_status = f"Our Telegram bot @{telegram_handle} is active." if has_telegram else "We haven't connected a Telegram bot yet."
+                return f"Hello! Great to be working with you on {product.name}. {tg_status} What would you like to focus on right now? We can find new decision makers, draft an outreach sequence, or import customer contacts."
+            return "Hello! I am SalesAI, your growth and outbound partner. What is your company website or product name so we can get our sales engine rolling?"
+
+        # Telegram questions
+        if "telegram" in lower or "bot" in lower:
+            if "link" in lower or "connected" in lower or "status" in lower or "did you" in lower or "have you" in lower:
+                if has_telegram:
+                    return f"Yes! Your Telegram bot @{telegram_handle} is linked and ready. You can command me to reach out to leads or paste Telegram usernames for automated follow-ups."
+                return "Telegram is not connected yet. To link it, message @BotFather on Telegram with /newbot, copy the HTTP API Token, and paste it right here in our chat."
+            return "To connect your Telegram bot, message @BotFather on Telegram, create a bot with /newbot, and paste the HTTP API Token here. I will link it automatically."
+
+        # Finding customers
+        if "find" in lower or "prospect" in lower or "customer" in lower or "lead" in lower:
+            if product:
+                return f"I am scanning for verified decision makers matching {product.name}'s ICP. You can review all discovered prospects in the Pipeline Kanban tab."
+            return "Please share your website or product description first so I know what target customer profiles to look for."
+
+        # Ad or copywriting
+        if "ad" in lower or "copy" in lower or "pitch" in lower or "message" in lower:
+            p_name = product.name if product else "our solution"
+            return f"Here is a warm, relationship-first outreach message for {p_name}:\n\nHi [Name],\n\nHope your week is going well! Saw your recent work and wanted to say hello. We help teams automate customer acquisition without the manual overhead. Would love to share how teams in your space are scaling pipeline if you're open to a brief chat."
+
+        # Default conversational response
+        if product:
+            return f"I am ready. We are set up for {product.name}. You can paste customer handles or emails, ask me to find new leads, or command an outreach campaign."
+        return "I am ready to help you sell. Share your company website, email, phone number, or Telegram bot token to get started."
 
     async def _verify_telegram_bot_token(self, token: str) -> Dict[str, Any]:
         """Tests the Telegram Bot API getMe endpoint to verify token validity."""
@@ -287,24 +383,6 @@ INSTRUCTIONS:
             db.commit()
             await taskmaster_engine.broadcast_event("BATCH_LEADS_IMPORTED", {"count": count})
         return count
-
-    def _generate_rule_based_response(self, text: str, entities: Dict[str, Any], product: Optional[Product]) -> str:
-        lower = text.lower()
-        if not product:
-            if entities.get("website_url") or entities.get("emails"):
-                return "Got it. I have configured our company details from what you shared. Tell me what problem your product solves, and I will begin finding people who need it."
-            return "Hello. I am SalesAI, your 24/7 sales and marketing partner. Give me your email, phone number, company website, or Telegram bot token, and I will set everything up and start finding customers."
-
-        if "telegram" in lower and ("bot" in lower or "create" in lower or "setup" in lower):
-            return "To connect your Telegram bot, open Telegram and message @BotFather with /newbot. Once you get the HTTP API Token, simply paste it right here in chat and I will link it automatically."
-
-        if "find" in lower or "prospect" in lower or "customer" in lower:
-            return f"Initiating customer discovery for {product.name}. I am identifying verified decision makers matching your ICP."
-
-        if "ad" in lower or "copy" in lower or "pitch" in lower:
-            return f"Here is a warm, relationship-first outreach message for {product.name}:\n\nHi [Name],\n\nHope your week is off to a great start! Saw what you're working on and wanted to reach out. We help teams streamline customer acquisition without the headache of manual prospecting. Would love to hear how you're approaching growth right now if you're open to a brief chat."
-
-        return f"Understood. I am keeping track of our pipeline for {product.name}. You can share customer contacts, ask me to draft ads, or command an outreach run anytime."
 
     def _strip_emojis(self, text: str) -> str:
         emoji_pattern = re.compile(

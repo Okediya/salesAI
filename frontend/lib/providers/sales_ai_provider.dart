@@ -285,7 +285,7 @@ class SalesAiProvider with ChangeNotifier {
     try {
       final history = _chatMessages.map((m) => {
         'role': m['sender'] == 'user' ? 'user' : 'model',
-        'parts': m['text'].toString(),
+        'text': (m['text'] ?? '').toString(),
       }).toList();
 
       final res = await _api.sendChatMessage(trimmed, history: history.cast<Map<String, String>>());
