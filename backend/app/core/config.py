@@ -1,6 +1,10 @@
 import os
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import Optional
+
+# Resolve path to the .env file in the backend/ directory
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
 
 class Settings(BaseSettings):
     APP_NAME: str = "SalesAI"
@@ -9,7 +13,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     
     # Gemini API Configuration
-    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-2.5-flash"
     GEMINI_REASONING_MODEL: str = "gemini-1.5-pro"
     
@@ -24,7 +28,7 @@ class Settings(BaseSettings):
     ENABLE_GROUNDING: bool = True
 
     class Config:
-        env_file = ".env"
+        env_file = str(_ENV_FILE)
         extra = "ignore"
 
 settings = Settings()
