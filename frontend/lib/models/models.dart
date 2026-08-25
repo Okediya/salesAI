@@ -49,6 +49,7 @@ class LeadModel {
   final String company;
   final String? role;
   final String? email;
+  final String? phoneNumber;
   final String? linkedinUrl;
   final String? twitterHandle;
   final String? companyWebsite;
@@ -67,6 +68,7 @@ class LeadModel {
     required this.company,
     this.role,
     this.email,
+    this.phoneNumber,
     this.linkedinUrl,
     this.twitterHandle,
     this.companyWebsite,
@@ -87,6 +89,7 @@ class LeadModel {
       company: json['company'] ?? '',
       role: json['role'],
       email: json['email'],
+      phoneNumber: json['phone_number'],
       linkedinUrl: json['linkedin_url'],
       twitterHandle: json['twitter_handle'],
       companyWebsite: json['company_website'],

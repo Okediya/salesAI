@@ -27,6 +27,18 @@ class Settings(BaseSettings):
     CONFIDENCE_THRESHOLD: float = 0.75
     ENABLE_GROUNDING: bool = True
 
+    # Email (SMTP) Configuration
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+
+    # Twilio / WhatsApp Configuration
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_WHATSAPP_FROM: str = "whatsapp:+14155238886"
+
     class Config:
         env_file = str(_ENV_FILE)
         extra = "ignore"

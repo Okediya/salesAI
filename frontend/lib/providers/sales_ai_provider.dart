@@ -164,4 +164,46 @@ class SalesAiProvider with ChangeNotifier {
     await refreshStatsSilent();
     return result;
   }
+
+  Future<LeadModel> createCustomLead(Map<String, dynamic> leadData) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final lead = await _api.createLead(leadData);
+      await fetchLeadsSilent();
+      await fetchCampaignsSilent();
+      await refreshStatsSilent();
+      return lead;
+    } catch (e) {
+      _errorMessage = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> dispatchEmail(int leadId) async {
+    try {
+      final result = await _api.dispatchEmail(leadId);
+      await fetchLeadsSilent();
+      await fetchCampaignsSilent();
+      await refreshStatsSilent();
+      return result;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> dispatchWhatsApp(int leadId) async {
+    try {
+      final result = await _api.dispatchWhatsApp(leadId);
+      await fetchLeadsSilent();
+      await fetchCampaignsSilent();
+      await refreshStatsSilent();
+      return result;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

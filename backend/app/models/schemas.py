@@ -46,6 +46,7 @@ class DiscoveredProspect(BaseModel):
     company: str
     role: str
     email: Optional[str] = None
+    phone_number: Optional[str] = None
     linkedin_url: Optional[str] = None
     company_website: Optional[str] = None
     industry: Optional[str] = None
@@ -81,6 +82,17 @@ class SdrAnalysisResult(BaseModel):
     confidence: float = 0.9
 
 # --- Lead Schemas ---
+class LeadCreate(BaseModel):
+    name: str = Field(..., description="Full name of the prospect/lead")
+    company: str = Field(..., description="Company name")
+    role: Optional[str] = Field("Founder & CEO", description="Job title / role")
+    email: Optional[str] = Field(None, description="Email address")
+    phone_number: Optional[str] = Field(None, description="WhatsApp or mobile phone number")
+    linkedin_url: Optional[str] = Field(None, description="LinkedIn profile or company page")
+    pain_points: Optional[str] = Field(None, description="Specific business challenges or pain points")
+    personalization_hooks: Optional[str] = Field(None, description="Context, recent milestones, or angle to hook")
+    auto_generate_campaign: bool = Field(True, description="Whether to immediately trigger AI outreach copy generation")
+
 class LeadResponse(BaseModel):
     id: int
     product_id: int
@@ -88,6 +100,7 @@ class LeadResponse(BaseModel):
     company: str
     role: Optional[str] = None
     email: Optional[str] = None
+    phone_number: Optional[str] = None
     linkedin_url: Optional[str] = None
     twitter_handle: Optional[str] = None
     company_website: Optional[str] = None
@@ -105,6 +118,14 @@ class LeadResponse(BaseModel):
 
 class LeadStatusUpdate(BaseModel):
     status: LeadStatus
+
+class DeliveryResult(BaseModel):
+    success: bool
+    channel: str
+    recipient: str
+    message: str
+    action_url: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 # --- Campaign Schemas ---
 class CampaignResponse(BaseModel):

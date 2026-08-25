@@ -26,16 +26,19 @@ class ActivityTerminal extends StatelessWidget {
             children: [
               const Icon(Icons.terminal, color: AppTheme.cyanAccent, size: 20),
               const SizedBox(width: 10),
-              const Text(
-                'LIVE 24/7 AGENT TELEMETRY FEED',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                  color: AppTheme.textPrimary,
+              const Expanded(
+                child: Text(
+                  'LIVE 24/7 AGENT TELEMETRY FEED',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(

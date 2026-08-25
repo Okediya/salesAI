@@ -165,7 +165,8 @@ class AgentOrchestrator:
             company=lead.company,
             role=lead.role or "Decision Maker",
             pain_points=lead.pain_points or "",
-            personalization_hooks=lead.personalization_hooks or ""
+            personalization_hooks=lead.personalization_hooks or "",
+            phone_number=lead.phone_number or ""
         )
 
         created_campaigns = []

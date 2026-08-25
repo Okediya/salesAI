@@ -137,6 +137,53 @@ class ApiService {
       throw Exception('Network error simulating reply: $e');
     }
   }
+
+  Future<LeadModel> createLead(Map<String, dynamic> data) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/leads/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data),
+      );
+      if (response.statusCode == 200) {
+        return LeadModel.fromJson(jsonDecode(response.body));
+      } else {
+        throw Exception('Failed to create lead: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error creating lead: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> dispatchEmail(int leadId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/leads/$leadId/dispatch-email'),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to dispatch email: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error dispatching email: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> dispatchWhatsApp(int leadId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/leads/$leadId/dispatch-whatsapp'),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to dispatch WhatsApp: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error dispatching WhatsApp: $e');
+    }
+  }
 }
 
 final apiService = ApiService();

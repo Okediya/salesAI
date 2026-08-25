@@ -20,6 +20,7 @@ class ChannelType(str, enum.Enum):
     EMAIL = "EMAIL"
     LINKEDIN = "LINKEDIN"
     TWITTER = "TWITTER"
+    WHATSAPP = "WHATSAPP"
 
 class CampaignStatus(str, enum.Enum):
     DRAFT = "DRAFT"
@@ -56,6 +57,7 @@ class Lead(Base):
     company = Column(String(255), nullable=False)
     role = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
+    phone_number = Column(String(50), nullable=True)
     linkedin_url = Column(String(500), nullable=True)
     twitter_handle = Column(String(255), nullable=True)
     company_website = Column(String(500), nullable=True)

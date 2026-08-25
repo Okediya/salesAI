@@ -4,6 +4,7 @@ import '../models/models.dart';
 import '../providers/sales_ai_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/lead_detail_modal.dart';
+import '../widgets/add_test_lead_modal.dart';
 
 class PipelineScreen extends StatelessWidget {
   const PipelineScreen({super.key});
@@ -52,10 +53,34 @@ class PipelineScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              ElevatedButton.icon(
-                onPressed: () => provider.triggerManualCycle(),
-                icon: const Icon(Icons.bolt, size: 16),
-                label: const Text('Prospect More Leads'),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.cyanAccent,
+                      foregroundColor: Colors.black,
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => const AddTestLeadModal(),
+                      );
+                    },
+                    icon: const Icon(Icons.person_add_alt_1, size: 16, color: Colors.black),
+                    label: const Text('Add Test Lead (You)', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppTheme.borderSubtle),
+                      foregroundColor: AppTheme.textPrimary,
+                    ),
+                    onPressed: () => provider.triggerManualCycle(),
+                    icon: const Icon(Icons.bolt, size: 16, color: AppTheme.cyanAccent),
+                    label: const Text('Prospect More Leads'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -223,6 +248,22 @@ class PipelineScreen extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (lead.email != null && lead.email!.isNotEmpty) ...[
+                  const Icon(Icons.email, size: 12, color: AppTheme.cyanAccent),
+                  const SizedBox(width: 4),
+                  const Text('Email', style: TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                  const SizedBox(width: 8),
+                ],
+                if (lead.phoneNumber != null && lead.phoneNumber!.isNotEmpty) ...[
+                  const Icon(Icons.chat, size: 12, color: AppTheme.emeraldGreen),
+                  const SizedBox(width: 4),
+                  const Text('WhatsApp', style: TextStyle(fontSize: 10, color: AppTheme.emeraldGreen)),
+                ],
+              ],
+            ),
           ],
         ),
       ),

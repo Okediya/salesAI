@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime
 from backend.app.core.database import get_db
-from backend.app.models.db_models import Lead, LeadStatus
-from backend.app.models.schemas import LeadResponse, LeadStatusUpdate, SdrAnalysisResult
+from backend.app.models.db_models import Lead, LeadStatus, Product, Campaign, CampaignStatus, ChannelType
+from backend.app.models.schemas import LeadCreate, LeadResponse, LeadStatusUpdate, SdrAnalysisResult, DeliveryResult
 from backend.app.agents.orchestrator import orchestrator
 from backend.app.engine.taskmaster_loop import taskmaster_engine
+from backend.app.services.delivery_service import delivery_service
 
 router = APIRouter(prefix="/leads", tags=["Leads & Pipeline"])
 
@@ -21,6 +23,55 @@ def get_leads(
     if status:
         query = query.filter(Lead.status == status)
     return query.order_by(Lead.updated_at.desc()).all()
+
+@router.post("/", response_model=LeadResponse)
+async def create_custom_lead(lead_in: LeadCreate, db: Session = Depends(get_db)):
+    """
+    Creates a custom test lead (e.g. user adding themselves) and optionally auto-generates outreach.
+    """
+    # Get active product or first product
+    active_product = db.query(Product).filter(Product.is_active == True).first()
+    if not active_product:
+        active_product = db.query(Product).first()
+    
+    if not active_product:
+        raise HTTPException(
+            status_code=400,
+            detail="No product found. Please onboard your startup/product first in the Product Setup tab."
+        )
+
+    lead = Lead(
+        product_id=active_product.id,
+        name=lead_in.name,
+        company=lead_in.company,
+        role=lead_in.role or "Founder & CEO",
+        email=lead_in.email,
+        phone_number=lead_in.phone_number,
+        linkedin_url=lead_in.linkedin_url,
+        confidence_score=0.98,
+        status=LeadStatus.DISCOVERED,
+        pain_points=lead_in.pain_points or f"Scaling {lead_in.company} pipeline efficiently without manual sales friction",
+        personalization_hooks=lead_in.personalization_hooks or f"Active leadership at {lead_in.company}",
+        is_approved=True
+    )
+    db.add(lead)
+    db.commit()
+    db.refresh(lead)
+
+    # Broadcast event to frontend
+    await taskmaster_engine.broadcast_event("NEW_LEAD_DISCOVERED", {
+        "id": lead.id,
+        "name": lead.name,
+        "company": lead.company,
+        "role": lead.role
+    })
+
+    # Auto generate outreach campaign sequence if requested
+    if lead_in.auto_generate_campaign:
+        await orchestrator.execute_campaign_generation(db, lead.id)
+
+    db.refresh(lead)
+    return lead
 
 @router.get("/{lead_id}", response_model=LeadResponse)
 def get_lead(lead_id: int, db: Session = Depends(get_db)):
@@ -51,6 +102,97 @@ async def trigger_lead_campaign_generation(lead_id: int, db: Session = Depends(g
     campaigns = await orchestrator.execute_campaign_generation(db, lead_id)
     return {"message": f"Generated {len(campaigns)} outreach sequence steps", "count": len(campaigns)}
 
+@router.post("/{lead_id}/dispatch-email", response_model=DeliveryResult)
+async def dispatch_lead_email(lead_id: int, db: Session = Depends(get_db)):
+    """Dispatches the generated email outreach to the lead's email address."""
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    if not lead.email:
+        raise HTTPException(status_code=400, detail="Lead does not have an email address configured.")
+
+    # Find the primary email campaign step
+    campaign = db.query(Campaign).filter(
+        Campaign.lead_id == lead_id,
+        Campaign.channel == ChannelType.EMAIL
+    ).order_by(Campaign.sequence_step.asc()).first()
+
+    subject = campaign.subject if campaign else f"Question regarding {lead.company}"
+    body = campaign.body if campaign else f"Hi {lead.name},\n\nWanted to reach out to connect regarding {lead.company}."
+
+    result = await delivery_service.dispatch_email(
+        to_email=lead.email,
+        subject=subject,
+        body=body,
+        lead_name=lead.name
+    )
+
+    if campaign and result.get("success"):
+        campaign.status = CampaignStatus.SENT
+        campaign.sent_at = datetime.utcnow()
+        lead.status = LeadStatus.CONTACTED
+        db.commit()
+
+        await taskmaster_engine.broadcast_event("CAMPAIGN_DISPATCHED", {
+            "lead_id": lead.id,
+            "channel": "EMAIL",
+            "recipient": lead.email
+        })
+
+    return DeliveryResult(
+        success=result.get("success", False),
+        channel="EMAIL",
+        recipient=lead.email,
+        message=result.get("message", "Email processed"),
+        action_url=result.get("action_url")
+    )
+
+@router.post("/{lead_id}/dispatch-whatsapp", response_model=DeliveryResult)
+async def dispatch_lead_whatsapp(lead_id: int, db: Session = Depends(get_db)):
+    """Dispatches or prepares the WhatsApp outreach message for the lead."""
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    if not lead.phone_number:
+        raise HTTPException(status_code=400, detail="Lead does not have a phone/WhatsApp number configured.")
+
+    # Find the WhatsApp or primary campaign
+    campaign = db.query(Campaign).filter(
+        Campaign.lead_id == lead_id,
+        Campaign.channel == ChannelType.WHATSAPP
+    ).first()
+
+    if not campaign:
+        campaign = db.query(Campaign).filter(Campaign.lead_id == lead_id).first()
+
+    body = campaign.body if campaign else f"Hi {lead.name} 👋 Reaching out to see if you're open to exploring how we can help {lead.company} scale sales pipeline automatically."
+
+    result = await delivery_service.dispatch_whatsapp(
+        phone_number=lead.phone_number,
+        message=body,
+        lead_name=lead.name
+    )
+
+    if campaign and result.get("success"):
+        campaign.status = CampaignStatus.SENT
+        campaign.sent_at = datetime.utcnow()
+        lead.status = LeadStatus.CONTACTED
+        db.commit()
+
+        await taskmaster_engine.broadcast_event("CAMPAIGN_DISPATCHED", {
+            "lead_id": lead.id,
+            "channel": "WHATSAPP",
+            "recipient": lead.phone_number
+        })
+
+    return DeliveryResult(
+        success=result.get("success", True),
+        channel="WHATSAPP",
+        recipient=lead.phone_number,
+        message=result.get("message", "WhatsApp ready"),
+        action_url=result.get("action_url")
+    )
+
 @router.post("/{lead_id}/simulate-reply", response_model=SdrAnalysisResult)
 async def simulate_prospect_reply(
     lead_id: int,
@@ -60,3 +202,4 @@ async def simulate_prospect_reply(
     """Triggers SdrAgent to analyze intent and produce objection-handling counter-response."""
     result = await orchestrator.execute_sdr_reply_handling(db, lead_id, message)
     return result
+

@@ -8,14 +8,14 @@ logger = logging.getLogger(__name__)
 
 COPYWRITER_SYSTEM_PROMPT = """
 You are the Elite AI Sales Copywriter Agent for SalesAI.
-Your mission is to generate high-converting, hyper-personalized, non-spammy outreach sequences for multiple channels (Email, LinkedIn, X/Twitter).
+Your mission is to generate high-converting, hyper-personalized, non-spammy outreach sequences for multiple channels (Email, WhatsApp, LinkedIn, X/Twitter).
 
 Rules for high-converting sales copy:
 1. Reference the prospect's company and specific pain point in the first sentence.
 2. Focus on outcomes and value, not generic feature lists.
-3. Keep emails under 120 words. Keep LinkedIn messages concise and conversational.
+3. Keep emails under 120 words. Keep WhatsApp messages concise, punchy, and conversational (with light emojis).
 4. Provide clear, low-friction Calls to Action (CTA), e.g. "Open to seeing a 2-minute interactive demo?"
-5. Produce a 3-step sequence: Step 1 (Hook), Step 2 (Value/Case Study), Step 3 (Low-friction Close).
+5. Produce a 3-step sequence: Step 1 (Hyper-personalized Email), Step 2 (Direct WhatsApp/LinkedIn message), Step 3 (Low-friction Close).
 """
 
 class CopywriterAgent:
@@ -31,12 +31,14 @@ class CopywriterAgent:
         company: str,
         role: str,
         pain_points: str,
-        personalization_hooks: str
+        personalization_hooks: str,
+        phone_number: str = None
     ) -> CampaignCopyResult:
         first_name = lead_name.split()[0] if lead_name else "there"
         prompt = f"""
 Generate a 3-step multichannel personalized outreach sequence for:
 Prospect: {lead_name} ({role} at {company})
+Phone/WhatsApp: {phone_number or 'Available'}
 Personalization Hook: {personalization_hooks}
 Prospect Pain Points: {pain_points}
 
@@ -46,8 +48,8 @@ Key Value Props: {', '.join(value_propositions) if value_propositions else 'Auto
 
 Produce:
 Step 1: Hyper-personalized initial cold email (with compelling subject)
-Step 2: Follow-up value message (Email or LinkedIn)
-Step 3: Quick conversational close / DM
+Step 2: Direct personalized WhatsApp message (conversational, punchy, low friction)
+Step 3: Quick value close / LinkedIn DM
 """
 
         fallback_data: Dict[str, Any] = {
@@ -59,15 +61,15 @@ Step 3: Quick conversational close / DM
                     "channel": "EMAIL",
                     "step_number": 1,
                     "subject": f"Quick thought on {company}'s pipeline growth, {first_name}?",
-                    "body": f"Hi {first_name},\n\nI saw {personalization_hooks} and wanted to reach out. Many {role}s we speak with find that {pain_points.lower()}.\n\nWe built {product_name} to solve this directly by operating as a 24/7 autonomous growth engine—generating qualified pipeline with zero manual overhead.\n\nWorth a quick 5-min look this week?\n\nBest,\nSalesAI Team",
+                    "body": f"Hi {first_name},\n\nI saw {personalization_hooks} and wanted to reach out. Many {role}s we speak with find that {pain_points.lower() if pain_points else 'scaling outbound sales requires too much manual effort'}.\n\nWe built {product_name} to solve this directly by operating as a 24/7 autonomous growth engine—generating qualified pipeline with zero manual overhead.\n\nWorth a quick 5-min look this week?\n\nBest,\nSalesAI Team",
                     "call_to_action": "Open to a brief 5-min chat this Thursday?"
                 },
                 {
-                    "channel": "EMAIL",
+                    "channel": "WHATSAPP",
                     "step_number": 2,
-                    "subject": f"How similar teams are solving this at {company}",
-                    "body": f"Hi {first_name},\n\nFollowing up on my previous note. Teams similar to {company} used {product_name} to accelerate their outbound conversions by 3x within 14 days without expanding their headcount.\n\nThought this might be timely given your current growth targets.\n\nShould I send over a 2-minute overview video?",
-                    "call_to_action": "Should I share the quick 2-minute overview video?"
+                    "subject": None,
+                    "body": f"Hi {first_name} 👋 Reaching out from {product_name}. Saw what you're building at {company}! We help teams solve {pain_points.lower() if pain_points else 'sales prospecting'} automatically with autonomous AI SDRs. Would you be open to a quick 2-min demo video?",
+                    "call_to_action": "Should I send over the quick 2-min demo?"
                 },
                 {
                     "channel": "LINKEDIN",

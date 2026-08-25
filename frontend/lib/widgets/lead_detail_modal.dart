@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../providers/sales_ai_provider.dart';
 import '../theme/app_theme.dart';
@@ -9,6 +10,31 @@ class LeadDetailModal extends StatelessWidget {
   final LeadModel lead;
 
   const LeadDetailModal({super.key, required this.lead});
+
+  Future<void> _launchActionUrl(BuildContext context, String? urlString, String channel) async {
+    if (urlString == null || urlString.isEmpty) return;
+    try {
+      final uri = Uri.parse(urlString);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.amberWarning,
+            content: Text('Could not automatically launch $channel. Please check browser permissions.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.roseDanger,
+            content: Text('Error launching $channel: $e'),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +114,7 @@ class LeadDetailModal extends StatelessWidget {
 
               // Prospect Intelligence
               const Text(
-                'AI PROSPECT INTELLIGENCE',
+                'AI PROSPECT INTELLIGENCE & CONTACT INFO',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -97,11 +123,145 @@ class LeadDetailModal extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
+              if (lead.email != null && lead.email!.isNotEmpty) ...[
+                _buildInfoRow('Email Address:', lead.email!),
+                const SizedBox(height: 8),
+              ],
+              if (lead.phoneNumber != null && lead.phoneNumber!.isNotEmpty) ...[
+                _buildInfoRow('WhatsApp / Phone:', lead.phoneNumber!),
+                const SizedBox(height: 8),
+              ],
               _buildInfoRow('Pain Points:', lead.painPoints ?? 'Standard operational bottlenecks'),
               const SizedBox(height: 8),
               _buildInfoRow('Personalization Hook:', lead.personalizationHooks ?? 'Recent company expansion'),
               const SizedBox(height: 8),
               _buildInfoRow('Industry & Vertical:', lead.industry ?? 'B2B SaaS / Technology'),
+
+              const SizedBox(height: 20),
+              // Live Outreach Action Buttons
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.bgSecondary,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.cyanAccent.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.send_rounded, size: 16, color: AppTheme.cyanAccent),
+                        SizedBox(width: 8),
+                        Text(
+                          'LIVE MULTI-CHANNEL DISPATCH',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.cyanAccent,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Trigger real outreach delivery to this lead via Email or WhatsApp:',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.cyanAccent,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          ),
+                          onPressed: () async {
+                            try {
+                              final res = await provider.dispatchEmail(lead.id);
+                              final actionUrl = res['action_url'] as String?;
+                              if (!context.mounted) return;
+                              if (actionUrl != null && actionUrl.startsWith('mailto:')) {
+                                await _launchActionUrl(context, actionUrl, 'Email Client');
+                              }
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: res['success'] == true ? AppTheme.emeraldGreen : AppTheme.amberWarning,
+                                  content: Text(res['message'] ?? 'Email processed successfully.'),
+                                  action: actionUrl != null
+                                      ? SnackBarAction(
+                                          label: 'OPEN MAIL',
+                                          textColor: Colors.white,
+                                          onPressed: () => _launchActionUrl(context, actionUrl, 'Email Client'),
+                                        )
+                                      : null,
+                                ),
+                              );
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: AppTheme.roseDanger,
+                                    content: Text('Email dispatch error: $e'),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.email, size: 16, color: Colors.black),
+                          label: const Text('Send Email (Inbox)', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.emeraldGreen,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          ),
+                          onPressed: () async {
+                            try {
+                              final res = await provider.dispatchWhatsApp(lead.id);
+                              final actionUrl = res['action_url'] as String?;
+                              if (!context.mounted) return;
+                              if (actionUrl != null) {
+                                await _launchActionUrl(context, actionUrl, 'WhatsApp');
+                              }
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: AppTheme.emeraldGreen,
+                                  content: Text(res['message'] ?? 'WhatsApp opened.'),
+                                  action: actionUrl != null
+                                      ? SnackBarAction(
+                                          label: 'RE-OPEN WA',
+                                          textColor: Colors.white,
+                                          onPressed: () => _launchActionUrl(context, actionUrl, 'WhatsApp'),
+                                        )
+                                      : null,
+                                ),
+                              );
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: AppTheme.roseDanger,
+                                    content: Text('WhatsApp error: $e'),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.chat, size: 16, color: Colors.white),
+                          label: const Text('Send to WhatsApp', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 20),
               const Divider(color: AppTheme.borderSubtle),
@@ -128,9 +288,9 @@ class LeadDetailModal extends StatelessWidget {
                       );
                     },
                     icon: const Icon(Icons.forum, size: 16),
-                    label: const Text('Simulate Inbound Reply', style: TextStyle(fontSize: 12)),
+                    label: const Text('Test SDR Conversation', style: TextStyle(fontSize: 12)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.emeraldGreen,
+                      backgroundColor: AppTheme.purpleAccent,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     ),
                   ),
@@ -166,9 +326,13 @@ class LeadDetailModal extends StatelessWidget {
                         Row(
                           children: [
                             Icon(
-                              camp.channel == 'EMAIL' ? Icons.email : Icons.share,
+                              camp.channel == 'EMAIL'
+                                  ? Icons.email
+                                  : camp.channel == 'WHATSAPP'
+                                      ? Icons.chat
+                                      : Icons.share,
                               size: 16,
-                              color: AppTheme.cyanAccent,
+                              color: camp.channel == 'WHATSAPP' ? AppTheme.emeraldGreen : AppTheme.cyanAccent,
                             ),
                             const SizedBox(width: 8),
                             Text(

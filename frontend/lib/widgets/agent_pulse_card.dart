@@ -89,29 +89,32 @@ class _AgentPulseCardState extends State<AgentPulseCard> with SingleTickerProvid
                 },
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isRunning ? '24/7 TASKMASTER AUTONOMOUS LOOP ACTIVE' : 'AGENT PAUSED',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                      color: isRunning ? AppTheme.emeraldGreen : AppTheme.amberWarning,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isRunning ? '24/7 TASKMASTER AUTONOMOUS LOOP ACTIVE' : 'AGENT PAUSED',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                        color: isRunning ? AppTheme.emeraldGreen : AppTheme.amberWarning,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Autonomy Mode: $mode',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textSecondary,
+                    const SizedBox(height: 2),
+                    Text(
+                      'Autonomy Mode: $mode',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               // Autopilot / Copilot Switch
               Container(
                 decoration: BoxDecoration(
