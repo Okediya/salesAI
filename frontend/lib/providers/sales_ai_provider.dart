@@ -147,21 +147,6 @@ class SalesAiProvider with ChangeNotifier {
     await fetchCampaignsSilent();
   }
 
-  Future<void> seedDemoData() async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      await _api.seedDemo();
-      await refreshStatsSilent();
-      await fetchLeadsSilent();
-      await fetchCampaignsSilent();
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
 
   Future<void> updateLeadPipelineStatus(int leadId, String status) async {
     await _api.updateLeadStatus(leadId, status);

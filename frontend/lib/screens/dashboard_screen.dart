@@ -52,17 +52,19 @@ class DashboardScreen extends StatelessWidget {
               Row(
                 children: [
                   OutlinedButton.icon(
-                    onPressed: () => provider.seedDemoData(),
-                    icon: const Icon(Icons.bolt, color: AppTheme.cyanAccent, size: 16),
-                    label: const Text('1-Click Demo Seed'),
+                    onPressed: () {
+                      if (onNavigate != null) onNavigate!(3); // Product setup
+                    },
+                    icon: const Icon(Icons.business, size: 16, color: AppTheme.pureWhite),
+                    label: const Text('Setup Product'),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton.icon(
                     onPressed: () {
-                      if (onNavigate != null) onNavigate!(1);
+                      if (onNavigate != null) onNavigate!(0); // Open Chat
                     },
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Onboard Product'),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 16, color: Colors.black),
+                    label: const Text('Chat with Bot'),
                   ),
                 ],
               ),

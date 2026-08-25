@@ -62,17 +62,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  void _loadPreset(String title, String tagline, String desc, String url, String market, String pricing, String valProps, String tgHandle) {
-    _nameController.text = title;
-    _taglineController.text = tagline;
-    _descController.text = desc;
-    _urlController.text = url;
-    _marketController.text = market;
-    _pricingController.text = pricing;
-    _valuePropsController.text = valProps;
-    _telegramHandleController.text = tgHandle;
-  }
-
   Future<void> _syncLiveWebsite() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
@@ -277,50 +266,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const Text(
                   'SalesAI crawls your live startup website, analyzes product screenshots via Gemini 2.5 Flash Vision, and synthesizes ideal customer personas (ICP) to autonomously drive outreach over Telegram, Email, and WhatsApp.',
                   style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
-                ),
-                const SizedBox(height: 20),
-
-                // Quick Startup Presets
-                const Text(
-                  'Quick Hackathon Presets:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 8,
-                  children: [
-                    ActionChip(
-                      backgroundColor: AppTheme.bgSecondary,
-                      avatar: const Icon(Icons.code, size: 16, color: AppTheme.cyanAccent),
-                      label: const Text('DevPulse AI (DevTools)', style: TextStyle(fontSize: 12, color: AppTheme.textPrimary)),
-                      onPressed: () => _loadPreset(
-                        'DevPulse AI',
-                        'Autonomous Code Review & Performance Sentry',
-                        'DevPulse AI autonomously analyzes enterprise pull requests, flags performance regressions, and suggests verified fixes before deployment.',
-                        'https://devpulse.ai',
-                        'Mid-to-large engineering teams, Series A-D B2B tech',
-                        '\$299/mo per 10 engineers',
-                        'Cuts code review time by 80%, prevents production regressions, saves \$150k/yr in CI compute',
-                        'devpulse_ai_bot'
-                      ),
-                    ),
-                    ActionChip(
-                      backgroundColor: AppTheme.bgSecondary,
-                      avatar: const Icon(Icons.cloud, size: 16, color: AppTheme.purpleAccent),
-                      label: const Text('CloudFin AI (FinOps)', style: TextStyle(fontSize: 12, color: AppTheme.textPrimary)),
-                      onPressed: () => _loadPreset(
-                        'CloudFin AI',
-                        'Autonomous Multi-Cloud Cost Optimization',
-                        'CloudFin AI continuously monitors AWS and GCP infrastructure to automatically shut down idle workloads and renegotiate spot instances.',
-                        'https://cloudfin.io',
-                        'VP Infrastructure, CTOs at high-growth cloud SaaS',
-                        '15% of verified cloud savings',
-                        'Instant 30% reduction in cloud bills, zero manual DevOps overhead, continuous 24/7 sentry',
-                        'cloudfin_support_bot'
-                      ),
-                    ),
-                  ],
                 ),
                 const SizedBox(height: 24),
                 const Divider(color: AppTheme.borderSubtle),

@@ -105,33 +105,6 @@ async def control_agent(req: AgentControlRequest, db: Session = Depends(get_db))
 def get_activity_logs(limit: int = 50, db: Session = Depends(get_db)):
     return db.query(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(limit).all()
 
-@router.post("/seed-demo")
-async def seed_demo_data(db: Session = Depends(get_db)):
-    """
-    1-Click Seed for instant Hackathon Judges Demo.
-    Seeds a high-tech product ('DevPulse AI: Autonomous Continuous Code Intelligence')
-    and runs full multi-agent prospecting, copy generation, and outreach cycles.
-    """
-    sample_product = ProductCreate(
-        name="DevPulse AI",
-        tagline="Autonomous Codebase Intelligence & Continuous Security Sentry",
-        description="DevPulse AI autonomously scans B2B enterprise repositories, auto-detects performance regressions, generates verified PR fixes, and optimizes CI/CD pipeline costs.",
-        website_url="https://devpulse.ai",
-        target_market="Series A-D B2B tech companies with 20-500 engineers",
-        pricing_model="$299/mo per team + Enterprise custom tier",
-        value_propositions="Cuts CI/CD compute costs by 40%, eliminates 90% of manual code review bottlenecks, autonomous 24/7 security scanning."
-    )
-
-    product = await orchestrator.onboard_product(db, sample_product)
-    
-    # Run initial prospecting cycle
-    leads = await orchestrator.execute_prospecting_cycle(db, product.id, batch_size=4)
-    
-    # Generate copy for first 2 leads
-    for lead in leads[:2]:
-        await orchestrator.execute_campaign_generation(db, lead.id)
-
-    return {"message": "Demo data seeded successfully!", "product_id": product.id, "leads_created": len(leads)}
 
 @router.post("/chat")
 async def chat_with_sales_agent(

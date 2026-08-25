@@ -98,12 +98,61 @@ INSTRUCTIONS:
 
         # Handle automated background actions triggered by conversation
         lower_msg = user_text.lower()
-        if "find" in lower_msg and ("customer" in lower_msg or "lead" in lower_msg or "prospect" in lower_msg):
+
+        # Auto-create product from chat if none exists and user provides enough info
+        if not active_product and (extracted_info.get("website_url") or extracted_info.get("emails") or extracted_info.get("phone_numbers")):
+            try:
+                website = extracted_info.get("website_url") or ""
+                email = extracted_info["emails"][0] if extracted_info.get("emails") else ""
+                phone = extracted_info["phone_numbers"][0] if extracted_info.get("phone_numbers") else ""
+                # Derive a company name from domain or email domain
+                company_name = "My Company"
+                if website:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(website)
+                    company_name = parsed.hostname.replace("www.", "").split(".")[0].capitalize() if parsed.hostname else "My Company"
+                elif email:
+                    company_name = email.split("@")[1].split(".")[0].capitalize()
+
+                new_product = Product(
+                    name=company_name,
+                    tagline=f"{company_name} - Sales Outreach",
+                    description=f"Product onboarded via chat. Website: {website}. Contact: {email or phone}.",
+                    website_url=website or None,
+                    target_market="B2B decision makers and potential customers",
+                    pricing_model="Contact for pricing",
+                    value_propositions="Automated outreach and customer engagement",
+                    is_active=True,
+                )
+                db.add(new_product)
+                db.commit()
+                db.refresh(new_product)
+                active_product = new_product
+                action_type = "PRODUCT_CREATED"
+                action_data = {"product_id": new_product.id, "name": new_product.name}
+
+                # Try to scrape website if provided
+                if website:
+                    try:
+                        scrape_res = await knowledge_extractor.scrape_website(website)
+                        if scrape_res.get("success"):
+                            active_product.knowledge_base = scrape_res.get("summary", "")
+                            db.commit()
+                    except Exception:
+                        pass
+
+                bot_reply += f"\n\nI have created your company profile for \"{company_name}\". I am now ready to find customers, run outreach, and handle follow-ups for you."
+            except Exception as ex:
+                logger.warning(f"Auto-create product failed: {ex}")
+
+        elif "find" in lower_msg and ("customer" in lower_msg or "lead" in lower_msg or "prospect" in lower_msg):
             if active_product:
                 discovered = await orchestrator.execute_prospecting_cycle(db, active_product.id, batch_size=3)
                 action_type = "PROSPECTS_DISCOVERED"
                 action_data = {"count": len(discovered), "leads": [l.name for l in discovered]}
                 bot_reply += f"\n\nDiscovered {len(discovered)} qualified prospects matching your ICP. You can view them in the Pipeline tab."
+            else:
+                bot_reply += "\n\nI need your company details first. Please share your website URL, email, or phone number so I can set up your profile."
 
         elif extracted_info.get("telegram_handles") or extracted_info.get("emails"):
             # Auto-import detected contacts into leads pipeline
@@ -137,6 +186,7 @@ INSTRUCTIONS:
             "action_data": action_data,
             "extracted_info": extracted_info
         }
+
 
     def _extract_entities(self, text: str) -> Dict[str, Any]:
         emails = re.findall(r"[\w\.-]+@[\w\.-]+\.\w+", text)

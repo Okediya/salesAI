@@ -200,7 +200,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               // Quick Actions
               const Text(
-                'Diagnostic & Demo Controls',
+                'Engine Controls',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
               ),
               const SizedBox(height: 12),
@@ -208,15 +208,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  ElevatedButton.icon(
-                    onPressed: () => provider.seedDemoData(),
-                    icon: const Icon(Icons.bolt),
-                    label: const Text('Seed DevPulse AI Demo'),
-                  ),
                   OutlinedButton.icon(
                     onPressed: () => provider.toggleAgentRunning(),
                     icon: Icon(isRunning ? Icons.pause : Icons.play_arrow),
-                    label: Text(isRunning ? 'Pause 24/7 Engine' : 'Resume 24/7 Engine'),
+                    label: Text(isRunning ? 'Pause Autonomous Engine' : 'Resume Autonomous Engine'),
                   ),
                   OutlinedButton.icon(
                     onPressed: () => provider.fetchInitialData(),
