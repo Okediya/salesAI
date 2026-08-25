@@ -260,7 +260,13 @@ class PipelineScreen extends StatelessWidget {
                 if (lead.phoneNumber != null && lead.phoneNumber!.isNotEmpty) ...[
                   const Icon(Icons.chat, size: 12, color: AppTheme.emeraldGreen),
                   const SizedBox(width: 4),
-                  const Text('WhatsApp', style: TextStyle(fontSize: 10, color: AppTheme.emeraldGreen)),
+                  const Text('WA', style: TextStyle(fontSize: 10, color: AppTheme.emeraldGreen)),
+                  const SizedBox(width: 8),
+                ],
+                if (lead.telegramHandle != null && lead.telegramHandle!.isNotEmpty) ...[
+                  const Icon(Icons.send_rounded, size: 12, color: Color(0xFF29B6F6)),
+                  const SizedBox(width: 4),
+                  const Text('TG', style: TextStyle(fontSize: 10, color: Color(0xFF29B6F6))),
                 ],
               ],
             ),

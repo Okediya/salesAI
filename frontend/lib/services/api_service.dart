@@ -184,6 +184,86 @@ class ApiService {
       throw Exception('Network error dispatching WhatsApp: $e');
     }
   }
+
+  Future<Map<String, dynamic>> dispatchTelegram(int leadId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/leads/$leadId/dispatch-telegram'),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to dispatch Telegram: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error dispatching Telegram: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> syncWebsite(int productId, {String? websiteUrl}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/products/$productId/sync-website'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          if (websiteUrl != null) 'website_url': websiteUrl,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to sync website: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error syncing website: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> analyzeProductImage(int productId, String imageBase64, {String? notes}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/products/$productId/analyze-image'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'image_base64': imageBase64,
+          if (notes != null) 'notes': notes,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to analyze image: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error analyzing image: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> handleInboundMessage(
+    int leadId,
+    String message, {
+    String channel = 'TELEGRAM',
+    bool autoDispatch = true,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/leads/$leadId/inbound'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'message': message,
+          'channel': channel,
+          'auto_dispatch_reply': autoDispatch,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to process inbound message: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error processing inbound message: $e');
+    }
+  }
 }
 
 final apiService = ApiService();

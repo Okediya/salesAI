@@ -131,6 +131,10 @@ class LeadDetailModal extends StatelessWidget {
                 _buildInfoRow('WhatsApp / Phone:', lead.phoneNumber!),
                 const SizedBox(height: 8),
               ],
+              if (lead.telegramHandle != null && lead.telegramHandle!.isNotEmpty) ...[
+                _buildInfoRow('Telegram Handle:', '@${lead.telegramHandle!.replaceAll('@', '')}'),
+                const SizedBox(height: 8),
+              ],
               _buildInfoRow('Pain Points:', lead.painPoints ?? 'Standard operational bottlenecks'),
               const SizedBox(height: 8),
               _buildInfoRow('Personalization Hook:', lead.personalizationHooks ?? 'Recent company expansion'),
@@ -165,7 +169,7 @@ class LeadDetailModal extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Trigger real outreach delivery to this lead via Email or WhatsApp:',
+                      'Trigger real outreach delivery to this lead via Telegram, Email, or WhatsApp:',
                       style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                     const SizedBox(height: 12),
@@ -173,6 +177,48 @@ class LeadDetailModal extends StatelessWidget {
                       spacing: 10,
                       runSpacing: 10,
                       children: [
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF29B6F6),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          ),
+                          onPressed: () async {
+                            try {
+                              final res = await provider.dispatchTelegram(lead.id);
+                              final actionUrl = res['action_url'] as String?;
+                              if (!context.mounted) return;
+                              if (actionUrl != null) {
+                                await _launchActionUrl(context, actionUrl, 'Telegram');
+                              }
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: const Color(0xFF0288D1),
+                                  content: Text(res['message'] ?? 'Telegram launched.'),
+                                  action: actionUrl != null
+                                      ? SnackBarAction(
+                                          label: 'OPEN TG',
+                                          textColor: Colors.white,
+                                          onPressed: () => _launchActionUrl(context, actionUrl, 'Telegram'),
+                                        )
+                                      : null,
+                                ),
+                              );
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: AppTheme.roseDanger,
+                                    content: Text('Telegram error: $e'),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.send_rounded, size: 16, color: Colors.white),
+                          label: const Text('Send Telegram', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.cyanAccent,
@@ -330,9 +376,15 @@ class LeadDetailModal extends StatelessWidget {
                                   ? Icons.email
                                   : camp.channel == 'WHATSAPP'
                                       ? Icons.chat
-                                      : Icons.share,
+                                      : camp.channel == 'TELEGRAM'
+                                          ? Icons.send_rounded
+                                          : Icons.share,
                               size: 16,
-                              color: camp.channel == 'WHATSAPP' ? AppTheme.emeraldGreen : AppTheme.cyanAccent,
+                              color: camp.channel == 'WHATSAPP'
+                                  ? AppTheme.emeraldGreen
+                                  : camp.channel == 'TELEGRAM'
+                                      ? const Color(0xFF29B6F6)
+                                      : AppTheme.cyanAccent,
                             ),
                             const SizedBox(width: 8),
                             Text(

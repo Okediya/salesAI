@@ -25,6 +25,9 @@ class _SimulateReplyModalState extends State<SimulateReplyModal> {
     "Please unsubscribe me and remove me from your list."
   ];
 
+  String _selectedChannel = 'TELEGRAM';
+  bool _autoDispatch = false;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -42,9 +45,20 @@ class _SimulateReplyModalState extends State<SimulateReplyModal> {
 
     try {
       final provider = context.read<SalesAiProvider>();
-      final result = await provider.testSdrReply(widget.lead.id, text);
+      final result = await provider.handleInboundMessage(
+        widget.lead.id,
+        text,
+        channel: _selectedChannel,
+        autoDispatch: _autoDispatch,
+      );
       setState(() {
-        _analysisResult = result;
+        _analysisResult = {
+          'sentiment': result['sentiment'],
+          'intent_score': result['intent_score'],
+          'recommended_action': result['recommended_action'],
+          'suggested_reply': result['agent_reply'],
+          'dispatch_result': result['dispatch_result'],
+        };
       });
     } catch (e) {
       if (mounted) {
@@ -124,6 +138,46 @@ class _SimulateReplyModalState extends State<SimulateReplyModal> {
                   labelText: 'Inbound Message',
                 ),
               ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.bgSecondary,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.borderSubtle),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedChannel,
+                          dropdownColor: AppTheme.bgCard,
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(value: 'TELEGRAM', child: Text('Channel: Telegram', style: TextStyle(fontSize: 12, color: AppTheme.textPrimary))),
+                            DropdownMenuItem(value: 'EMAIL', child: Text('Channel: Email', style: TextStyle(fontSize: 12, color: AppTheme.textPrimary))),
+                            DropdownMenuItem(value: 'WHATSAPP', child: Text('Channel: WhatsApp', style: TextStyle(fontSize: 12, color: AppTheme.textPrimary))),
+                          ],
+                          onChanged: (val) => setState(() => _selectedChannel = val ?? 'TELEGRAM'),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _autoDispatch,
+                        activeColor: AppTheme.cyanAccent,
+                        checkColor: Colors.black,
+                        onChanged: (val) => setState(() => _autoDispatch = val ?? false),
+                      ),
+                      const Text('Auto-Dispatch Reply', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                    ],
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -136,7 +190,7 @@ class _SimulateReplyModalState extends State<SimulateReplyModal> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.auto_awesome),
-                  label: Text(_isProcessing ? 'SDR Analyzing...' : 'Run SDR Autonomous Analysis'),
+                  label: Text(_isProcessing ? 'SDR Analyzing...' : 'Run SDR Autonomous Analysis & Reply'),
                 ),
               ),
               if (_analysisResult != null) ...[

@@ -34,6 +34,8 @@ Website: {product_data.website_url or 'N/A'}
 Target Market Notes: {product_data.target_market or 'N/A'}
 Pricing Model: {product_data.pricing_model or 'N/A'}
 Value Propositions: {product_data.value_propositions or 'N/A'}
+Continuous Scraped Knowledge Base: {product_data.knowledge_base or 'N/A'}
+Gemini Vision UI Analysis & Features: {product_data.image_features or 'N/A'}
 
 Provide a rigorous strategic ICP breakdown.
 """

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.core.config import settings
-from backend.app.core.database import engine, Base
+from backend.app.core.database import init_db
 from backend.app.routers import products, leads, campaigns, agent, ws
 from backend.app.engine.taskmaster_loop import taskmaster_engine
 
@@ -14,8 +14,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("SalesAI")
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Create database tables + auto-migrate new columns
+init_db()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -32,24 +32,30 @@ class CopywriterAgent:
         role: str,
         pain_points: str,
         personalization_hooks: str,
-        phone_number: str = None
+        phone_number: str = None,
+        telegram_handle: str = None,
+        knowledge_base: str = None,
+        image_features: str = None
     ) -> CampaignCopyResult:
         first_name = lead_name.split()[0] if lead_name else "there"
         prompt = f"""
 Generate a 3-step multichannel personalized outreach sequence for:
 Prospect: {lead_name} ({role} at {company})
 Phone/WhatsApp: {phone_number or 'Available'}
+Telegram Handle: {telegram_handle or 'Available'}
 Personalization Hook: {personalization_hooks}
 Prospect Pain Points: {pain_points}
 
 Product Being Sold: {product_name}
 Product Value: {product_description}
 Key Value Props: {', '.join(value_propositions) if value_propositions else 'Automated 24/7 revenue engine'}
+Continuous Knowledge Base: {knowledge_base or 'N/A'}
+UI Features Analyzed: {image_features or 'N/A'}
 
 Produce:
 Step 1: Hyper-personalized initial cold email (with compelling subject)
-Step 2: Direct personalized WhatsApp message (conversational, punchy, low friction)
-Step 3: Quick value close / LinkedIn DM
+Step 2: Direct personalized Telegram / WhatsApp message (conversational, punchy, low friction)
+Step 3: Direct follow-up / LinkedIn DM
 """
 
         fallback_data: Dict[str, Any] = {
@@ -65,18 +71,18 @@ Step 3: Quick value close / LinkedIn DM
                     "call_to_action": "Open to a brief 5-min chat this Thursday?"
                 },
                 {
-                    "channel": "WHATSAPP",
+                    "channel": "TELEGRAM" if telegram_handle else "WHATSAPP",
                     "step_number": 2,
                     "subject": None,
-                    "body": f"Hi {first_name} 👋 Reaching out from {product_name}. Saw what you're building at {company}! We help teams solve {pain_points.lower() if pain_points else 'sales prospecting'} automatically with autonomous AI SDRs. Would you be open to a quick 2-min demo video?",
+                    "body": f"Hi {first_name} 👋 Reaching out from {product_name}. Saw what you're building at {company}! We help teams solve {pain_points.lower() if pain_points else 'sales prospecting'} automatically with autonomous AI agents. Open to a quick 2-minute overview?",
                     "call_to_action": "Should I send over the quick 2-min demo?"
                 },
                 {
                     "channel": "LINKEDIN",
                     "step_number": 3,
                     "subject": None,
-                    "body": f"Hey {first_name} — noticed your leadership at {company}. If you're currently exploring ways to automate and supercharge outbound sales 24/7, {product_name} could be a game-changer for your team. Either way, love what you're building!",
-                    "call_to_action": "Let me know if you'd like a quick preview!"
+                    "body": f"Hi {first_name}, following up on my previous message. We recently helped similar teams in your space achieve 3x pipeline velocity with {product_name}. If this is a priority for {company} this quarter, happy to share a case study.",
+                    "call_to_action": "Reply 'YES' and I'll send the case study right over."
                 }
             ]
         }

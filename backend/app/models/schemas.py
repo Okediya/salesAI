@@ -12,17 +12,46 @@ class ProductCreate(BaseModel):
     target_market: Optional[str] = Field(None, description="Target industry, company size, geography")
     pricing_model: Optional[str] = Field(None, description="Pricing model e.g. $49/mo, Free tier, Enterprise quote")
     value_propositions: Optional[str] = Field(None, description="Key differentiators and value props")
+    telegram_handle: Optional[str] = Field(None, description="Company or sales Telegram username/handle")
+    telegram_bot_token: Optional[str] = Field(None, description="Optional Telegram bot token for automated dispatch")
+    knowledge_base: Optional[str] = Field(None, description="Scraped or provided company knowledge base")
+    image_features: Optional[str] = Field(None, description="Gemini Vision extracted visual UI/product features")
 
 class ProductResponse(ProductCreate):
     id: int
     icp_summary: Optional[str] = None
     target_roles: Optional[str] = None
+    knowledge_base: Optional[str] = None
+    image_features: Optional[str] = None
+    telegram_handle: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
+    website_last_synced: Optional[datetime] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
 
     class Config:
         from_attributes = True
+
+class WebsiteSyncRequest(BaseModel):
+    website_url: Optional[str] = None
+
+class WebsiteSyncResponse(BaseModel):
+    success: bool
+    website_url: str
+    extracted_knowledge_summary: str
+    synced_at: datetime
+
+class ImageAnalysisRequest(BaseModel):
+    image_base64: str = Field(..., description="Base64 encoded image or screenshot of the product")
+    image_type: Optional[str] = "image/png"
+    notes: Optional[str] = None
+
+class ImageAnalysisResponse(BaseModel):
+    success: bool
+    extracted_ui_features: str
+    detected_capabilities: List[str] = []
+    analyzed_at: datetime
 
 # --- Structured Agent Output Schemas ---
 class TargetPersona(BaseModel):
@@ -88,6 +117,7 @@ class LeadCreate(BaseModel):
     role: Optional[str] = Field("Founder & CEO", description="Job title / role")
     email: Optional[str] = Field(None, description="Email address")
     phone_number: Optional[str] = Field(None, description="WhatsApp or mobile phone number")
+    telegram_handle: Optional[str] = Field(None, description="Telegram username (e.g. @username or username)")
     linkedin_url: Optional[str] = Field(None, description="LinkedIn profile or company page")
     pain_points: Optional[str] = Field(None, description="Specific business challenges or pain points")
     personalization_hooks: Optional[str] = Field(None, description="Context, recent milestones, or angle to hook")
@@ -101,6 +131,7 @@ class LeadResponse(BaseModel):
     role: Optional[str] = None
     email: Optional[str] = None
     phone_number: Optional[str] = None
+    telegram_handle: Optional[str] = None
     linkedin_url: Optional[str] = None
     twitter_handle: Optional[str] = None
     company_website: Optional[str] = None
@@ -126,6 +157,21 @@ class DeliveryResult(BaseModel):
     message: str
     action_url: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class InboundMessageRequest(BaseModel):
+    message: str = Field(..., description="Inbound text received from lead via Telegram/Email/Chat")
+    channel: Optional[ChannelType] = ChannelType.TELEGRAM
+    auto_dispatch_reply: bool = Field(True, description="Whether to automatically dispatch the SDR reply back to the lead")
+
+class InboundMessageResponse(BaseModel):
+    success: bool
+    sentiment: str
+    intent_score: float
+    objection_type: Optional[str] = None
+    recommended_action: str
+    agent_reply: str
+    dispatch_result: Optional[DeliveryResult] = None
+    processed_at: datetime
 
 # --- Campaign Schemas ---
 class CampaignResponse(BaseModel):

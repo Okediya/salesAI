@@ -47,6 +47,7 @@ async def create_custom_lead(lead_in: LeadCreate, db: Session = Depends(get_db))
         role=lead_in.role or "Founder & CEO",
         email=lead_in.email,
         phone_number=lead_in.phone_number,
+        telegram_handle=lead_in.telegram_handle,
         linkedin_url=lead_in.linkedin_url,
         confidence_score=0.98,
         status=LeadStatus.DISCOVERED,
@@ -193,6 +194,112 @@ async def dispatch_lead_whatsapp(lead_id: int, db: Session = Depends(get_db)):
         action_url=result.get("action_url")
     )
 
+@router.post("/{lead_id}/dispatch-telegram", response_model=DeliveryResult)
+async def dispatch_lead_telegram(lead_id: int, db: Session = Depends(get_db)):
+    """Dispatches or prepares the Telegram outreach message for the lead."""
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    if not lead.telegram_handle and not lead.phone_number:
+        raise HTTPException(status_code=400, detail="Lead does not have a Telegram handle or phone number configured.")
+
+    # Find the Telegram campaign or fallback
+    campaign = db.query(Campaign).filter(
+        Campaign.lead_id == lead_id,
+        Campaign.channel == ChannelType.TELEGRAM
+    ).first()
+
+    if not campaign:
+        campaign = db.query(Campaign).filter(Campaign.lead_id == lead_id).first()
+
+    body = campaign.body if campaign else f"Hi {lead.name} 👋 Saw your work at {lead.company}! Open to seeing how we help teams scale revenue with autonomous 24/7 agents?"
+
+    product = db.query(Product).filter(Product.id == lead.product_id).first()
+    bot_token = product.telegram_bot_token if product else None
+
+    result = await delivery_service.dispatch_telegram(
+        telegram_handle=lead.telegram_handle or lead.phone_number,
+        message=body,
+        lead_name=lead.name,
+        bot_token=bot_token
+    )
+
+    if campaign and result.get("success"):
+        campaign.status = CampaignStatus.SENT
+        campaign.sent_at = datetime.utcnow()
+        lead.status = LeadStatus.CONTACTED
+        db.commit()
+
+        await taskmaster_engine.broadcast_event("CAMPAIGN_DISPATCHED", {
+            "lead_id": lead.id,
+            "channel": "TELEGRAM",
+            "recipient": lead.telegram_handle or lead.phone_number
+        })
+
+    return DeliveryResult(
+        success=result.get("success", True),
+        channel="TELEGRAM",
+        recipient=lead.telegram_handle or lead.phone_number or "Telegram",
+        message=result.get("message", "Telegram pitch ready"),
+        action_url=result.get("action_url")
+    )
+
+@router.post("/{lead_id}/inbound")
+async def handle_inbound_lead_message(
+    lead_id: int,
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Receives an incoming message from a lead (e.g. from Telegram/Email/Chatbot),
+    runs SdrAgent with continuous product knowledge, updates pipeline status,
+    and optionally auto-dispatches the counter-response.
+    """
+    incoming_msg = request.get("message")
+    if not incoming_msg:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    channel = request.get("channel", "TELEGRAM").upper()
+    auto_dispatch = request.get("auto_dispatch_reply", True)
+
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    # Run SDR agent analysis with continuous knowledge base
+    analysis = await orchestrator.execute_sdr_reply_handling(db, lead_id, incoming_msg)
+
+    dispatch_res = None
+    if auto_dispatch:
+        if channel == "TELEGRAM" and (lead.telegram_handle or lead.phone_number):
+            product = db.query(Product).filter(Product.id == lead.product_id).first()
+            dispatch_res = await delivery_service.dispatch_telegram(
+                telegram_handle=lead.telegram_handle or lead.phone_number,
+                message=analysis.suggested_reply,
+                lead_name=lead.name,
+                bot_token=product.telegram_bot_token if product else None
+            )
+        elif channel == "EMAIL" and lead.email:
+            dispatch_res = await delivery_service.dispatch_email(
+                to_email=lead.email,
+                subject=f"Re: Growth at {lead.company}",
+                body=analysis.suggested_reply,
+                lead_name=lead.name
+            )
+
+    return {
+        "success": True,
+        "lead_id": lead.id,
+        "lead_name": lead.name,
+        "sentiment": analysis.sentiment,
+        "intent_score": analysis.intent_score,
+        "objection_type": analysis.objection_type,
+        "recommended_action": analysis.recommended_action,
+        "agent_reply": analysis.suggested_reply,
+        "dispatch_result": dispatch_res,
+        "processed_at": datetime.utcnow()
+    }
+
 @router.post("/{lead_id}/simulate-reply", response_model=SdrAnalysisResult)
 async def simulate_prospect_reply(
     lead_id: int,
@@ -202,4 +309,5 @@ async def simulate_prospect_reply(
     """Triggers SdrAgent to analyze intent and produce objection-handling counter-response."""
     result = await orchestrator.execute_sdr_reply_handling(db, lead_id, message)
     return result
+
 

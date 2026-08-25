@@ -9,6 +9,11 @@ class ProductModel {
   final String? valuePropositions;
   final String? icpSummary;
   final String? targetRoles;
+  final String? knowledgeBase;
+  final String? imageFeatures;
+  final String? telegramHandle;
+  final String? telegramBotToken;
+  final DateTime? websiteLastSynced;
   final bool isActive;
 
   ProductModel({
@@ -22,6 +27,11 @@ class ProductModel {
     this.valuePropositions,
     this.icpSummary,
     this.targetRoles,
+    this.knowledgeBase,
+    this.imageFeatures,
+    this.telegramHandle,
+    this.telegramBotToken,
+    this.websiteLastSynced,
     required this.isActive,
   });
 
@@ -37,6 +47,13 @@ class ProductModel {
       valuePropositions: json['value_propositions'],
       icpSummary: json['icp_summary'],
       targetRoles: json['target_roles'],
+      knowledgeBase: json['knowledge_base'],
+      imageFeatures: json['image_features'],
+      telegramHandle: json['telegram_handle'],
+      telegramBotToken: json['telegram_bot_token'],
+      websiteLastSynced: json['website_last_synced'] != null
+          ? DateTime.tryParse(json['website_last_synced'])
+          : null,
       isActive: json['is_active'] ?? true,
     );
   }
@@ -50,6 +67,7 @@ class LeadModel {
   final String? role;
   final String? email;
   final String? phoneNumber;
+  final String? telegramHandle;
   final String? linkedinUrl;
   final String? twitterHandle;
   final String? companyWebsite;
@@ -69,6 +87,7 @@ class LeadModel {
     this.role,
     this.email,
     this.phoneNumber,
+    this.telegramHandle,
     this.linkedinUrl,
     this.twitterHandle,
     this.companyWebsite,
@@ -90,6 +109,7 @@ class LeadModel {
       role: json['role'],
       email: json['email'],
       phoneNumber: json['phone_number'],
+      telegramHandle: json['telegram_handle'],
       linkedinUrl: json['linkedin_url'],
       twitterHandle: json['twitter_handle'],
       companyWebsite: json['company_website'],

@@ -18,6 +18,7 @@ class _AddTestLeadModalState extends State<AddTestLeadModal> {
   final _roleController = TextEditingController(text: 'Founder & CEO');
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _telegramController = TextEditingController();
   final _painPointsController = TextEditingController();
   final _hookController = TextEditingController();
 
@@ -31,6 +32,7 @@ class _AddTestLeadModalState extends State<AddTestLeadModal> {
     _roleController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _telegramController.dispose();
     _painPointsController.dispose();
     _hookController.dispose();
     super.dispose();
@@ -51,6 +53,7 @@ class _AddTestLeadModalState extends State<AddTestLeadModal> {
         'role': _roleController.text.trim(),
         'email': _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         'phone_number': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+        'telegram_handle': _telegramController.text.trim().isEmpty ? null : _telegramController.text.trim(),
         'pain_points': _painPointsController.text.trim().isEmpty
             ? 'Scaling customer acquisition and converting cold leads'
             : _painPointsController.text.trim(),
@@ -206,7 +209,7 @@ class _AddTestLeadModalState extends State<AddTestLeadModal> {
                 ),
                 const SizedBox(height: 16),
 
-                // Email & Phone Row
+                // Contact Channels Row (Email, WhatsApp, Telegram)
                 Row(
                   children: [
                     Expanded(
@@ -218,7 +221,7 @@ class _AddTestLeadModalState extends State<AddTestLeadModal> {
                         keyboardType: TextInputType.emailAddress,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: _buildTextField(
                         controller: _phoneController,
@@ -226,6 +229,15 @@ class _AddTestLeadModalState extends State<AddTestLeadModal> {
                         hint: '+2348012345678',
                         icon: Icons.phone_android,
                         keyboardType: TextInputType.phone,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _telegramController,
+                        label: 'Telegram Handle',
+                        hint: '@username or username',
+                        icon: Icons.send_rounded,
                       ),
                     ),
                   ],

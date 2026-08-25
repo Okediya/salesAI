@@ -58,6 +58,10 @@ class AgentOrchestrator:
             value_propositions=json.dumps(analysis.core_value_props),
             icp_summary=analysis.icp_summary,
             target_roles=json.dumps(analysis.target_roles),
+            knowledge_base=product_in.knowledge_base,
+            image_features=product_in.image_features,
+            telegram_handle=product_in.telegram_handle,
+            telegram_bot_token=product_in.telegram_bot_token,
             is_active=True
         )
         db.add(db_product)
@@ -166,7 +170,10 @@ class AgentOrchestrator:
             role=lead.role or "Decision Maker",
             pain_points=lead.pain_points or "",
             personalization_hooks=lead.personalization_hooks or "",
-            phone_number=lead.phone_number or ""
+            phone_number=lead.phone_number or "",
+            telegram_handle=lead.telegram_handle or "",
+            knowledge_base=product.knowledge_base or "",
+            image_features=product.image_features or ""
         )
 
         created_campaigns = []
@@ -189,7 +196,7 @@ class AgentOrchestrator:
             db,
             role="CopywriterAgent",
             action=f"Generated {len(created_campaigns)}-Step Outreach Sequence for {lead.name}",
-            details=f"Multi-channel sequence ready (Email & LinkedIn).",
+            details=f"Multi-channel sequence ready ({', '.join([c.channel.value for c in created_campaigns])}).",
             level="SUCCESS"
         )
 
@@ -219,7 +226,9 @@ class AgentOrchestrator:
             product_name=product_name,
             lead_name=lead.name,
             lead_company=lead.company,
-            incoming_message=incoming_message
+            incoming_message=incoming_message,
+            knowledge_base=product.knowledge_base if product else None,
+            product_description=product.description if product else None
         )
 
         # Record interaction

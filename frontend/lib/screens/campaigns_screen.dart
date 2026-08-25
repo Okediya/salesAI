@@ -113,12 +113,28 @@ class CampaignsScreen extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     color: camp.channel == 'EMAIL'
                                         ? AppTheme.cyanAccent.withOpacity(0.12)
-                                        : AppTheme.purpleAccent.withOpacity(0.12),
+                                        : camp.channel == 'WHATSAPP'
+                                            ? AppTheme.emeraldGreen.withOpacity(0.12)
+                                            : camp.channel == 'TELEGRAM'
+                                                ? const Color(0xFF29B6F6).withOpacity(0.12)
+                                                : AppTheme.purpleAccent.withOpacity(0.12),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
-                                    camp.channel == 'EMAIL' ? Icons.email : Icons.share,
-                                    color: camp.channel == 'EMAIL' ? AppTheme.cyanAccent : AppTheme.purpleAccent,
+                                    camp.channel == 'EMAIL'
+                                        ? Icons.email
+                                        : camp.channel == 'WHATSAPP'
+                                            ? Icons.chat
+                                            : camp.channel == 'TELEGRAM'
+                                                ? Icons.send_rounded
+                                                : Icons.share,
+                                    color: camp.channel == 'EMAIL'
+                                        ? AppTheme.cyanAccent
+                                        : camp.channel == 'WHATSAPP'
+                                            ? AppTheme.emeraldGreen
+                                            : camp.channel == 'TELEGRAM'
+                                                ? const Color(0xFF29B6F6)
+                                                : AppTheme.purpleAccent,
                                     size: 18,
                                   ),
                                 ),

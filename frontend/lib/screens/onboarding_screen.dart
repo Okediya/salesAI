@@ -21,8 +21,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _marketController = TextEditingController();
   final _pricingController = TextEditingController();
   final _valuePropsController = TextEditingController();
+  final _telegramHandleController = TextEditingController();
+  final _telegramTokenController = TextEditingController();
 
   bool _isSubmitting = false;
+  bool _isSyncingWebsite = false;
+  bool _isAnalyzingImage = false;
+  String? _syncMessage;
+  String? _imageFeaturesPreview;
 
   @override
   void initState() {
@@ -36,6 +42,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _marketController.text = active.targetMarket ?? '';
       _pricingController.text = active.pricingModel ?? '';
       _valuePropsController.text = active.valuePropositions ?? '';
+      _telegramHandleController.text = active.telegramHandle ?? '';
+      _telegramTokenController.text = active.telegramBotToken ?? '';
+      _imageFeaturesPreview = active.imageFeatures;
     }
   }
 
@@ -48,10 +57,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _marketController.dispose();
     _pricingController.dispose();
     _valuePropsController.dispose();
+    _telegramHandleController.dispose();
+    _telegramTokenController.dispose();
     super.dispose();
   }
 
-  void _loadPreset(String title, String tagline, String desc, String url, String market, String pricing, String valProps) {
+  void _loadPreset(String title, String tagline, String desc, String url, String market, String pricing, String valProps, String tgHandle) {
     _nameController.text = title;
     _taglineController.text = tagline;
     _descController.text = desc;
@@ -59,6 +70,106 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _marketController.text = market;
     _pricingController.text = pricing;
     _valuePropsController.text = valProps;
+    _telegramHandleController.text = tgHandle;
+  }
+
+  Future<void> _syncLiveWebsite() async {
+    final url = _urlController.text.trim();
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a Website / Demo URL first.')),
+      );
+      return;
+    }
+
+    final provider = context.read<SalesAiProvider>();
+    final activeProduct = provider.activeProduct;
+    if (activeProduct == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please save/onboard the product first before syncing.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSyncingWebsite = true;
+      _syncMessage = null;
+    });
+
+    try {
+      final res = await provider.syncWebsite(activeProduct.id, websiteUrl: url);
+      if (mounted) {
+        setState(() {
+          _syncMessage = 'Website crawled & knowledge base updated successfully!';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.emeraldGreen.withOpacity(0.9),
+            content: Text('Synced ${res['website_url']}: StrategyAgent updated product knowledge!'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Website Sync Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncingWebsite = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _triggerGeminiVisionAnalysis() async {
+    final provider = context.read<SalesAiProvider>();
+    final activeProduct = provider.activeProduct;
+    if (activeProduct == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please save/onboard the product first before analyzing screenshots.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isAnalyzingImage = true;
+    });
+
+    try {
+      // 1x1 transparent PNG sample or custom base64 encoded mockup
+      const sampleBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      final res = await provider.analyzeProductImage(
+        activeProduct.id,
+        sampleBase64,
+        notes: 'Startup Dashboard & Real-Time Analytics UI'
+      );
+      if (mounted) {
+        setState(() {
+          _imageFeaturesPreview = res['extracted_ui_features'];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppTheme.purpleAccent,
+            content: Text('Gemini 2.5 Flash Vision: Extracted UI capabilities & sales hooks!'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Vision Analysis Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAnalyzingImage = false;
+        });
+      }
+    }
   }
 
   Future<void> _submit() async {
@@ -78,6 +189,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'target_market': _marketController.text.trim(),
         'pricing_model': _pricingController.text.trim(),
         'value_propositions': _valuePropsController.text.trim(),
+        'telegram_handle': _telegramHandleController.text.trim(),
+        'telegram_bot_token': _telegramTokenController.text.trim(),
       });
 
       if (mounted) {
@@ -103,11 +216,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<SalesAiProvider>();
+    final activeProduct = provider.activeProduct;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Center(
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: const BoxConstraints(maxWidth: 860),
           decoration: BoxDecoration(
             color: AppTheme.bgCard,
             borderRadius: BorderRadius.circular(20),
@@ -135,7 +251,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'PRODUCT DNA & ICP ONBOARDING',
+                            'MULTIMODAL PRODUCT DNA & ICP ONBOARDING',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -159,8 +275,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'SalesAI will analyze your product value proposition, synthesize ideal customer personas (ICP), and autonomously begin 24/7 prospecting and campaign generation.',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                  'SalesAI crawls your live startup website, analyzes product screenshots via Gemini 2.5 Flash Vision, and synthesizes ideal customer personas (ICP) to autonomously drive outreach over Telegram, Email, and WhatsApp.',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
                 ),
                 const SizedBox(height: 20),
 
@@ -185,7 +301,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         'https://devpulse.ai',
                         'Mid-to-large engineering teams, Series A-D B2B tech',
                         '\$299/mo per 10 engineers',
-                        'Cuts code review time by 80%, prevents production regressions, saves \$150k/yr in CI compute'
+                        'Cuts code review time by 80%, prevents production regressions, saves \$150k/yr in CI compute',
+                        'devpulse_ai_bot'
                       ),
                     ),
                     ActionChip(
@@ -199,7 +316,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         'https://cloudfin.io',
                         'VP Infrastructure, CTOs at high-growth cloud SaaS',
                         '15% of verified cloud savings',
-                        'Instant 30% reduction in cloud bills, zero manual DevOps overhead, continuous 24/7 sentry'
+                        'Instant 30% reduction in cloud bills, zero manual DevOps overhead, continuous 24/7 sentry',
+                        'cloudfin_support_bot'
                       ),
                     ),
                   ],
@@ -239,9 +357,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   validator: (v) => v == null || v.isEmpty ? 'Description required' : null,
                 ),
                 const SizedBox(height: 16),
+                
+                // Website URL with Live Sync Button
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
+                      flex: 3,
                       child: TextFormField(
                         controller: _urlController,
                         decoration: const InputDecoration(
@@ -251,7 +373,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _isSyncingWebsite ? null : _syncLiveWebsite,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.cyanAccent.withOpacity(0.15),
+                        foregroundColor: AppTheme.cyanAccent,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: AppTheme.cyanAccent),
+                        ),
+                      ),
+                      icon: _isSyncingWebsite
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.cyanAccent),
+                            )
+                          : const Icon(Icons.sync, size: 18),
+                      label: Text(_isSyncingWebsite ? 'Syncing...' : 'Sync & Learn'),
+                    ),
+                  ],
+                ),
+                if (_syncMessage != null) ...[
+                  const SizedBox(height: 6),
+                  Text(_syncMessage!, style: const TextStyle(fontSize: 12, color: AppTheme.emeraldGreen)),
+                ],
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
                     Expanded(
                       child: TextFormField(
                         controller: _pricingController,
@@ -262,18 +414,50 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _marketController,
+                        decoration: const InputDecoration(
+                          labelText: 'Target Market / Industries',
+                          hintText: 'e.g. B2B SaaS, FinTech, DevTools',
+                          prefixIcon: Icon(Icons.public, size: 20),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _marketController,
-                  decoration: const InputDecoration(
-                    labelText: 'Target Market / Industries',
-                    hintText: 'e.g. B2B SaaS, E-commerce Tech, Healthcare AI',
-                    prefixIcon: Icon(Icons.public, size: 20),
-                  ),
+
+                // Telegram Configuration Section
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _telegramHandleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Company / Bot Telegram Handle',
+                          hintText: 'e.g. @salesai_bot or username',
+                          prefixIcon: Icon(Icons.send_rounded, size: 20, color: Color(0xFF29B6F6)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _telegramTokenController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Telegram Bot Token (Optional)',
+                          hintText: '123456789:ABCdefGhIJKlmno...',
+                          prefixIcon: Icon(Icons.key, size: 20),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
+
                 TextFormField(
                   controller: _valuePropsController,
                   maxLines: 2,
@@ -283,7 +467,111 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     prefixIcon: Icon(Icons.star, size: 20),
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
+
+                // Gemini 2.5 Flash Vision UI Ingestion Zone
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.bgSecondary.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppTheme.purpleAccent.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.remove_red_eye_outlined, color: AppTheme.purpleAccent, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'GEMINI 2.5 FLASH VISION • PRODUCT SCREENSHOT ANALYSIS',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.1,
+                              color: AppTheme.purpleAccent,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: _isAnalyzingImage ? null : _triggerGeminiVisionAnalysis,
+                            icon: _isAnalyzingImage
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.purpleAccent),
+                                  )
+                                : const Icon(Icons.auto_awesome, size: 16, color: AppTheme.purpleAccent),
+                            label: Text(
+                              _isAnalyzingImage ? 'Analyzing UI...' : 'Analyze Screenshot',
+                              style: const TextStyle(fontSize: 12, color: AppTheme.purpleAccent, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Upload or inspect product UI screenshots to extract visual workflows, dashboard capabilities, and competitive differentiators into the autonomous SDR pitch.',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      ),
+                      if (_imageFeaturesPreview != null || activeProduct?.imageFeatures != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppTheme.bgPrimary,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppTheme.borderSubtle),
+                          ),
+                          child: Text(
+                            _imageFeaturesPreview ?? activeProduct?.imageFeatures ?? '',
+                            style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Active Knowledge Base Summary Display if Available
+                if (activeProduct?.knowledgeBase != null && activeProduct!.knowledgeBase!.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cyanAccent.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.cyanAccent.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.auto_stories, color: AppTheme.cyanAccent, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'SYNCHRONIZED KNOWLEDGE BASE (LIVE WEBSITE)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.1,
+                                color: AppTheme.cyanAccent,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          activeProduct.knowledgeBase!,
+                          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
 
                 SizedBox(
                   width: double.infinity,

@@ -48,6 +48,24 @@ class DeliveryService:
     def twilio_from(self) -> str:
         return settings.TWILIO_WHATSAPP_FROM or os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
 
+    @property
+    def telegram_token(self) -> str:
+        return getattr(settings, "TELEGRAM_BOT_TOKEN", "") or os.getenv("TELEGRAM_BOT_TOKEN", "")
+
+    def clean_telegram_handle(self, handle: str) -> str:
+        """Sanitizes telegram username handle."""
+        if not handle:
+            return ""
+        return handle.strip().replace("@", "").replace("https://t.me/", "").replace("t.me/", "")
+
+    def generate_telegram_link(self, handle: str, message: str) -> str:
+        """Generates a 1-click Telegram deep link with pre-filled message."""
+        clean_handle = self.clean_telegram_handle(handle)
+        encoded_message = urllib.parse.quote(message)
+        if clean_handle:
+            return f"https://t.me/{clean_handle}?text={encoded_message}"
+        return f"https://t.me/share/url?url=&text={encoded_message}"
+
     def clean_phone_number(self, phone: str) -> str:
         """Sanitizes phone number for international WhatsApp format."""
         if not phone:
@@ -172,4 +190,45 @@ class DeliveryService:
             "action_url": mailto_link
         }
 
+    async def dispatch_telegram(self, telegram_handle: str, message: str, lead_name: str, bot_token: Optional[str] = None) -> Dict[str, Any]:
+        """Dispatches Telegram outreach via Telegram Bot API or provides direct 1-click Telegram deep link."""
+        clean_handle = self.clean_telegram_handle(telegram_handle)
+        direct_link = self.generate_telegram_link(telegram_handle, message)
+        active_token = bot_token or self.telegram_token
+
+        if active_token and clean_handle:
+            try:
+                import httpx
+                # If clean_handle is a numeric chat_id or @username
+                chat_target = f"@{clean_handle}" if not clean_handle.startswith("@") and not clean_handle.isdigit() else clean_handle
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(
+                        f"https://api.telegram.org/bot{active_token}/sendMessage",
+                        json={
+                            "chat_id": chat_target,
+                            "text": message,
+                            "parse_mode": "Markdown"
+                        }
+                    )
+                    if resp.status_code in (200, 201):
+                        logger.info(f"Telegram message dispatched via Bot API to {chat_target}")
+                        return {
+                            "success": True,
+                            "channel": "TELEGRAM",
+                            "recipient": telegram_handle,
+                            "message": f"Telegram message successfully dispatched to @{clean_handle} via Telegram Bot API.",
+                            "action_url": direct_link
+                        }
+            except Exception as e:
+                logger.warning(f"Telegram Bot API dispatch error: {e}. Falling back to 1-click URL.")
+
+        return {
+            "success": True,
+            "channel": "TELEGRAM",
+            "recipient": f"@{clean_handle}" if clean_handle else "Telegram",
+            "message": f"Telegram pitch ready! Click the link below to open Telegram with the personalized message pre-filled for {lead_name}.",
+            "action_url": direct_link
+        }
+
 delivery_service = DeliveryService()
+

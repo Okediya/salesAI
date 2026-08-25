@@ -206,4 +206,70 @@ class SalesAiProvider with ChangeNotifier {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> dispatchTelegram(int leadId) async {
+    try {
+      final result = await _api.dispatchTelegram(leadId);
+      await fetchLeadsSilent();
+      await fetchCampaignsSilent();
+      await refreshStatsSilent();
+      return result;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> syncWebsite(int productId, {String? websiteUrl}) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final result = await _api.syncWebsite(productId, websiteUrl: websiteUrl);
+      await refreshStatsSilent();
+      return result;
+    } catch (e) {
+      _errorMessage = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> analyzeProductImage(int productId, String imageBase64, {String? notes}) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final result = await _api.analyzeProductImage(productId, imageBase64, notes: notes);
+      await refreshStatsSilent();
+      return result;
+    } catch (e) {
+      _errorMessage = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> handleInboundMessage(
+    int leadId,
+    String message, {
+    String channel = 'TELEGRAM',
+    bool autoDispatch = true,
+  }) async {
+    try {
+      final result = await _api.handleInboundMessage(
+        leadId,
+        message,
+        channel: channel,
+        autoDispatch: autoDispatch,
+      );
+      await fetchLeadsSilent();
+      await fetchCampaignsSilent();
+      await refreshStatsSilent();
+      return result;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

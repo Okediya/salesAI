@@ -25,12 +25,16 @@ class SdrAgent:
         product_name: str,
         lead_name: str,
         lead_company: str,
-        incoming_message: str
+        incoming_message: str,
+        knowledge_base: str = None,
+        product_description: str = None
     ) -> SdrAnalysisResult:
         first_name = lead_name.split()[0] if lead_name else "there"
         prompt = f"""
-Analyze the following prospect reply:
+Analyze the following prospect reply and craft an autonomous SDR counter-response:
 Product Being Sold: {product_name}
+Product Context: {product_description or 'Autonomous 24/7 sales agent'}
+Company Knowledge Base & FAQs: {knowledge_base or 'N/A'}
 Prospect: {lead_name} at {lead_company}
 Incoming Message: "{incoming_message}"
 
@@ -39,7 +43,7 @@ Determine:
 2. Intent Score (0-100)
 3. Objection Type (Price, Timing, Competitor, Feature, Authority, None)
 4. Recommended Action
-5. Suggested Reply (Polite, concise, value-focused counter-response)
+5. Suggested Reply (Polite, concise, value-focused counter-response answering their specific question using the knowledge base)
 """
 
         # Calibrate fallback based on simple keywords

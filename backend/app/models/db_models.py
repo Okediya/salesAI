@@ -21,6 +21,7 @@ class ChannelType(str, enum.Enum):
     LINKEDIN = "LINKEDIN"
     TWITTER = "TWITTER"
     WHATSAPP = "WHATSAPP"
+    TELEGRAM = "TELEGRAM"
 
 class CampaignStatus(str, enum.Enum):
     DRAFT = "DRAFT"
@@ -41,6 +42,11 @@ class Product(Base):
     value_propositions = Column(Text, nullable=True)  # JSON or newline list
     icp_summary = Column(Text, nullable=True)          # Extracted ICP by StrategyAgent
     target_roles = Column(Text, nullable=True)         # Target decision maker titles
+    knowledge_base = Column(Text, nullable=True)       # Scraped and extracted website knowledge
+    image_features = Column(Text, nullable=True)       # Gemini Vision extracted visual UI/product features
+    telegram_handle = Column(String(255), nullable=True)  # Company/Bot Telegram handle
+    telegram_bot_token = Column(String(255), nullable=True) # Optional Telegram Bot Token
+    website_last_synced = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -58,6 +64,7 @@ class Lead(Base):
     role = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
     phone_number = Column(String(50), nullable=True)
+    telegram_handle = Column(String(255), nullable=True)
     linkedin_url = Column(String(500), nullable=True)
     twitter_handle = Column(String(255), nullable=True)
     company_website = Column(String(500), nullable=True)
